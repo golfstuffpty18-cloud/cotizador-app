@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS opportunities (
   reference_price NUMERIC,
   window_info TEXT,
   deadline TIMESTAMPTZ,
+  items JSONB,
   category_match BOOLEAN NOT NULL,
   recommendation TEXT NOT NULL,
   reasoning TEXT NOT NULL,
@@ -36,7 +37,29 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS quotes (
+  id SERIAL PRIMARY KEY,
+  opportunity_id INTEGER NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  cliente_nombre TEXT,
+  cliente_ruc TEXT,
+  cliente_direccion TEXT,
+  cliente_ciudad TEXT,
+  forma_pago TEXT DEFAULT 'Crédito',
+  comentarios TEXT,
+  items JSONB NOT NULL DEFAULT '[]',
+  subtotal NUMERIC,
+  itbm NUMERIC,
+  total NUMERIC,
+  estado TEXT NOT NULL DEFAULT 'borrador',
+  pdf BYTEA,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at TIMESTAMPTZ,
+  UNIQUE(opportunity_id)
+);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 `;
 
 const CLEANUP = `

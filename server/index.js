@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { pool, init } = require('../shared/db');
+const { generateQuotePdf } = require('../shared/generateQuotePdf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,6 +75,84 @@ app.post('/api/opportunities/:id/decision', async (req, res) => {
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
+});
+
+app.get('/api/opportunities/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
+app.get('/api/opportunities/:id/quote', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [req.params.id]);
+  if (!rows.length) return res.json(null);
+  const { pdf, ...rest } = rows[0];
+  res.json(rest);
+});
+
+function computeTotals(items) {
+  const subtotal = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0);
+  const itbm = subtotal * 0.07;
+  return { subtotal, itbm, total: subtotal + itbm };
+}
+
+app.post('/api/opportunities/:id/quote', async (req, res) => {
+  const oppId = req.params.id;
+  const { cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items } = req.body || {};
+  const safeItems = Array.isArray(items) ? items : [];
+  const { subtotal, itbm, total } = computeTotals(safeItems);
+
+  const { rows } = await pool.query(
+    `INSERT INTO quotes (opportunity_id, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items, subtotal, itbm, total, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+     ON CONFLICT (opportunity_id) DO UPDATE SET
+       cliente_nombre = EXCLUDED.cliente_nombre,
+       cliente_ruc = EXCLUDED.cliente_ruc,
+       cliente_direccion = EXCLUDED.cliente_direccion,
+       cliente_ciudad = EXCLUDED.cliente_ciudad,
+       forma_pago = EXCLUDED.forma_pago,
+       comentarios = EXCLUDED.comentarios,
+       items = EXCLUDED.items,
+       subtotal = EXCLUDED.subtotal,
+       itbm = EXCLUDED.itbm,
+       total = EXCLUDED.total,
+       updated_at = now()
+     WHERE quotes.estado = 'borrador'
+     RETURNING *`,
+    [oppId, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago || 'Crédito', comentarios,
+     JSON.stringify(safeItems), subtotal, itbm, total]
+  );
+
+  if (!rows.length) return res.status(409).json({ error: 'la cotización ya fue aprobada y no se puede editar' });
+  const { pdf, ...rest } = rows[0];
+  res.json(rest);
+});
+
+app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
+  const oppId = req.params.id;
+  const { rows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [oppId]);
+  if (!rows.length) return res.status(404).json({ error: 'primero guarda un borrador de cotización' });
+  const quote = rows[0];
+
+  const { rows: oppRows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [oppId]);
+  const opportunity = oppRows[0];
+
+  const pdfBuffer = await generateQuotePdf({ quote, opportunity });
+
+  await pool.query(
+    `UPDATE quotes SET estado = 'aprobada', pdf = $1, approved_at = now(), updated_at = now() WHERE opportunity_id = $2`,
+    [pdfBuffer, oppId]
+  );
+
+  res.json({ ok: true, estado: 'aprobada' });
+});
+
+app.get('/api/opportunities/:id/quote/pdf', async (req, res) => {
+  const { rows } = await pool.query('SELECT pdf, opportunity_id FROM quotes WHERE opportunity_id = $1', [req.params.id]);
+  if (!rows.length || !rows[0].pdf) return res.status(404).send('PDF no disponible. Aprueba la cotización primero.');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="cotizacion-${req.params.id}.pdf"`);
+  res.send(rows[0].pdf);
 });
 
 init()

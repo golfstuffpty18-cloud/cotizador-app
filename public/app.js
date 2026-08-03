@@ -121,6 +121,7 @@ function card(op) {
       <button class="yes ${op.decision === 'participar' ? 'active' : ''}">Sí, participar</button>
       <button class="no ${op.decision === 'no_participar' ? 'active' : ''}">No participar</button>
     </div>
+    ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}
   `;
   div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));
   div.querySelector('.no').addEventListener('click', () => decide(op.id, 'no_participar'));

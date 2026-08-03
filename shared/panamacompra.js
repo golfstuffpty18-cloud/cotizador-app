@@ -60,14 +60,29 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
   const secciones = json.result.pageComponentes;
 
   const campos = {};
+  let items = [];
   for (const sec of secciones) {
-    if (Array.isArray(sec.value)) {
-      for (const item of sec.value) {
-        if (item && item.nombre) campos[item.nombre.trim()] = item.value;
-      }
+    if (!Array.isArray(sec.value)) continue;
+    if (sec.titulo === 'Ítems de la cotización') {
+      items = sec.value
+        .filter(i => i && typeof i.descripcion === 'string')
+        .map(i => ({
+          numRenglon: i.numRenglon,
+          descripcion: i.descripcion,
+          clasificacion: i.clasificacion,
+          codigo: i.codigo,
+          cantidad: i.cantidad,
+          unidad: i.unidad,
+          precioReferencia: i.precioReferencia,
+        }))
+        .sort((a, b) => (a.numRenglon || 0) - (b.numRenglon || 0));
+      continue;
+    }
+    for (const item of sec.value) {
+      if (item && item.nombre) campos[item.nombre.trim()] = item.value;
     }
   }
-  return campos;
+  return { campos, items };
 }
 
 function extraerPrecio(texto) {

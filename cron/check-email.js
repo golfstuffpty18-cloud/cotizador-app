@@ -48,11 +48,11 @@ async function alreadyKnown(actNumber) {
 async function saveOpportunity(op) {
   await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, reference_price, window_info, deadline, category_match, recommendation, reasoning, decision, email_uid)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11)
+      (act_number, convocatoria, title, entity, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12)
      ON CONFLICT (act_number, convocatoria) DO NOTHING`,
     [op.actNumber, op.convocatoria, op.title, op.entity, op.referencePrice, op.windowInfo, op.deadline,
-     op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
+     JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
   );
 }
 
@@ -113,7 +113,7 @@ async function main() {
 
       // Evaluate every convocatoria found for this act number
       for (const r of registros) {
-        const campos = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
+        const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
         const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
         const title = campos['Título'] || r.titulo;
         const entity = campos['Entidad'] || '';
@@ -130,6 +130,7 @@ async function main() {
           referencePrice,
           windowInfo,
           deadline,
+          items,
           categoryMatch: ev.categoryMatch,
           recommendation: ev.recommendation,
           reasoning: ev.reasoning,
