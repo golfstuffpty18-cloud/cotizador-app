@@ -2,7 +2,9 @@ name: Revisar correo de cotizaciones
 
 on:
   schedule:
-    - cron: "0 12-21 * * 1-5"
+    # GitHub retrasa o descarta corridas justo en punto de hora (mayor carga);
+    # se corre en el minuto :07 para evitar ese congestionamiento.
+    - cron: "7 12-21 * * 1-5"
   workflow_dispatch: {}
 
 jobs:
