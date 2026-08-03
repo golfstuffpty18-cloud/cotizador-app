@@ -37,6 +37,25 @@ async function enableNotifications() {
 
 document.getElementById('enableBtn').addEventListener('click', enableNotifications);
 
+async function checkExistingSubscription() {
+  const statusEl = document.getElementById('status');
+  const btn = document.getElementById('enableBtn');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') {
+      btn.style.display = 'none';
+      statusEl.textContent = 'Notificaciones activadas ✅';
+    }
+  } catch (err) {
+    // Silencioso: si falla la verificación, simplemente se deja el botón visible.
+  }
+}
+
+checkExistingSubscription();
+
 function fmtDate(d) {
   return new Date(d).toLocaleString('es-PA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
