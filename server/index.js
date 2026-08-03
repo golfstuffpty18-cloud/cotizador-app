@@ -7,6 +7,7 @@ const { generateQuotePdf } = require('../shared/generateQuotePdf');
 const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems } = require('../shared/catalog');
+const { runCheckEmailJob } = require('../shared/checkEmailJob');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 function requireAuth(req, res, next) {
+  if (req.path === '/api/cron/check-email') return next(); // tiene su propia llave secreta
   if (!ACCESS_CODE) return next(); // no code configured -> open (local/dev only)
   if (req.cookies[COOKIE_NAME] === ACCESS_CODE) return next();
   if (req.path === '/login.html' || req.path === '/api/login' || req.path.startsWith('/icons/') || req.path === '/manifest.json' || req.path === '/sw.js') {
@@ -202,6 +204,20 @@ app.get('/api/opportunities/:id/quote/pdf', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="cotizacion-${req.params.id}.pdf"`);
   res.send(rows[0].pdf);
+});
+
+app.all('/api/cron/check-email', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+  try {
+    const result = await runCheckEmailJob();
+    res.json(result);
+  } catch (err) {
+    console.error('Error en /api/cron/check-email:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Otro'];
