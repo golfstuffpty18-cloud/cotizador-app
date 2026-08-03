@@ -8,6 +8,12 @@ const pool = new Pool({
     : { rejectUnauthorized: false },
 });
 
+// Sin este manejador, un corte de red en una conexión inactiva del pool
+// tumba todo el proceso (y con él, el servidor web completo).
+pool.on('error', (err) => {
+  console.error('Error inesperado en una conexión inactiva del pool de Postgres:', err.message);
+});
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS opportunities (
   id SERIAL PRIMARY KEY,
@@ -60,6 +66,11 @@ CREATE TABLE IF NOT EXISTS quotes (
   UNIQUE(opportunity_id)
 );
 
+CREATE TABLE IF NOT EXISTS processed_acts (
+  act_number TEXT PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS catalog_items (
   id SERIAL PRIMARY KEY,
   descripcion TEXT NOT NULL,
@@ -90,6 +101,18 @@ WHERE (deadline IS NOT NULL AND deadline < now())
 async function init() {
   await pool.query(SCHEMA);
   await backfillDeadlines();
+  await backfillProcessedActs();
+}
+
+// Registra en processed_acts cualquier act_number que ya exista en
+// opportunities pero que aún no tenga marca de "procesado" (por ejemplo,
+// filas guardadas antes de que esta tabla existiera).
+async function backfillProcessedActs() {
+  await pool.query(`
+    INSERT INTO processed_acts (act_number, processed_at)
+    SELECT DISTINCT act_number, now() FROM opportunities
+    ON CONFLICT (act_number) DO NOTHING
+  `);
 }
 
 // Fixes rows created before the `deadline` column existed (or where parsing
@@ -112,4 +135,16 @@ async function cleanupExpired() {
   return rowCount;
 }
 
-module.exports = { pool, init, cleanupExpired };
+async function isActProcessed(actNumber) {
+  const { rows } = await pool.query('SELECT 1 FROM processed_acts WHERE act_number = $1', [actNumber]);
+  return rows.length > 0;
+}
+
+async function markActProcessed(actNumber) {
+  await pool.query(
+    'INSERT INTO processed_acts (act_number) VALUES ($1) ON CONFLICT (act_number) DO NOTHING',
+    [actNumber]
+  );
+}
+
+module.exports = { pool, init, cleanupExpired, isActProcessed, markActProcessed };

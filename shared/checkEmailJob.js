@@ -1,6 +1,6 @@
 const { ImapFlow } = require('imapflow');
 const webpush = require('web-push');
-const { pool, init, cleanupExpired } = require('./db');
+const { pool, init, cleanupExpired, isActProcessed, markActProcessed } = require('./db');
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
 const { parseDeadline } = require('./parseWindow');
@@ -36,16 +36,9 @@ async function fetchCandidateEmails() {
   return found;
 }
 
-async function alreadyKnown(actNumber) {
-  const { rows } = await pool.query(
-    'SELECT 1 FROM opportunities WHERE act_number = $1 LIMIT 1',
-    [actNumber]
-  );
-  return rows.length > 0;
-}
-
+// Devuelve true solo si de verdad insertó una fila nueva (no si ya existía).
 async function saveOpportunity(op) {
-  await pool.query(
+  const { rowCount } = await pool.query(
     `INSERT INTO opportunities
       (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14)
@@ -53,6 +46,7 @@ async function saveOpportunity(op) {
     [op.actNumber, op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice, op.windowInfo, op.deadline,
      JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
   );
+  return rowCount > 0;
 }
 
 async function notifySubscribers(op) {
@@ -103,9 +97,15 @@ async function runCheckEmailJob() {
     const emails = await fetchCandidateEmails();
     push(`Correos candidatos encontrados: ${emails.length}`);
 
+    // Un mismo acto puede llegar en más de un correo (reenvíos/recordatorios
+    // de PanamaCompra); nos quedamos con uno solo por acto antes de procesar.
+    const seenActNumbers = new Set();
     const newActNumbers = [];
     for (const e of emails) {
-      if (!(await alreadyKnown(e.actNumber))) newActNumbers.push(e);
+      if (seenActNumbers.has(e.actNumber)) continue;
+      if (await isActProcessed(e.actNumber)) continue;
+      seenActNumbers.add(e.actNumber);
+      newActNumbers.push(e);
     }
     push(`Actos nuevos a evaluar: ${newActNumbers.length}`);
 
@@ -143,11 +143,19 @@ async function runCheckEmailJob() {
               emailUid: e.uid,
             };
 
-            await saveOpportunity(op);
-            await notifySubscribers(op);
-            saved++;
-            push(`Guardado y notificado: ${op.actNumber} conv.${op.convocatoria} -> ${op.recommendation}`);
+            const inserted = await saveOpportunity(op);
+            if (inserted) {
+              await notifySubscribers(op);
+              saved++;
+              push(`Guardado y notificado: ${op.actNumber} conv.${op.convocatoria} -> ${op.recommendation}`);
+            } else {
+              push(`Ya existía, no se vuelve a notificar: ${op.actNumber} conv.${op.convocatoria}`);
+            }
           }
+
+          // Ya se procesó por completo este acto: no volver a mirarlo aunque
+          // luego se borre de "opportunities" por vencido.
+          await markActProcessed(e.actNumber);
         } catch (err) {
           push(`Error procesando ${e.actNumber}: ${err.message}`);
         }
