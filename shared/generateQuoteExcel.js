@@ -94,6 +94,14 @@ async function generateQuoteExcel({ opportunity, quote }) {
     row.getCell(6).value = { formula: `PRODUCT(1.07,E${r})`, result: 0 };
     row.getCell(7).value = { formula: `PRODUCT(F${r},D${r})`, result: 0 };
     row.getCell(8).value = item.margenG || null; // <-- input del usuario (multiplicador, ej. 1.3)
+    row.getCell(8).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['"1.0,1.1,1.2,1.3,1.4,1.5"'],
+      showErrorMessage: true,
+      errorTitle: 'Valor no válido',
+      error: 'Elige un porcentaje de la lista (1.0 a 1.5).',
+    };
     row.getCell(9).value = { formula: `PRODUCT(F${r},H${r})`, result: 0 };
     row.getCell(10).value = { formula: `PRODUCT(I${r},D${r})`, result: 0 };
     row.getCell(11).value = { formula: `PRODUCT(J${r},0.07)`, result: 0 };
