@@ -32,13 +32,15 @@ const LABELS = {
   'Forma de pago:': 'forma_pago',
 };
 
+// Columnas: A Renglón | B Descripción | C Modelo | D Unidades |
+// E Costo Distribuidor | F Costo+ITBM | G Gasto | H %G | I Precio Un. | J Subtotal | K ITBM | L Suma
 async function parseQuoteExcel(buffer) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
   const sheet = wb.worksheets[0];
   if (!sheet) throw new Error('El archivo no tiene hojas.');
 
-  const isKnownTemplate = cellValueText(sheet.getCell('H1')) === MARKER;
+  const isKnownTemplate = cellValueText(sheet.getCell('N1')) === MARKER;
 
   const result = {
     cliente_nombre: '', cliente_ruc: '', cliente_direccion: '', cliente_ciudad: '', forma_pago: 'Crédito',
@@ -54,7 +56,7 @@ async function parseQuoteExcel(buffer) {
       result[LABELS[colA]] = cellValueText(row.getCell(2));
     }
     if (colA === 'COMENTARIOS') comentariosLabelRow = rowNumber;
-    if (cellValueText(row.getCell(2)) === 'Descripción' && cellValueText(row.getCell(6)).toUpperCase().includes('PRECIO UNITARIO')) {
+    if (cellValueText(row.getCell(2)) === 'Descripción' && cellValueText(row.getCell(9)).toUpperCase().includes('PRECIO UN')) {
       headerRow = rowNumber;
     }
   });
@@ -70,9 +72,11 @@ async function parseQuoteExcel(buffer) {
     result.items.push({
       numRenglon: cellValueNumber(row.getCell(1)) || (result.items.length + 1),
       descripcion,
-      cantidad: cellValueNumber(row.getCell(3)),
-      unidad: cellValueText(row.getCell(4)),
-      precioUnitario: cellValueNumber(row.getCell(6)),
+      modelo: cellValueText(row.getCell(3)),
+      cantidad: cellValueNumber(row.getCell(4)),
+      costoDistribuidor: cellValueNumber(row.getCell(5)),
+      margenG: cellValueNumber(row.getCell(8)),
+      precioUnitario: cellValueNumber(row.getCell(9)),
     });
   }
 

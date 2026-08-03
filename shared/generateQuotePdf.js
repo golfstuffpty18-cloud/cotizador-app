@@ -71,12 +71,13 @@ function generateQuotePdf({ quote, opportunity }) {
     // ===== Items table =====
     const items = Array.isArray(quote.items) ? quote.items : [];
     const cols = [
-      { key: 'renglon', label: '#', w: 24, align: 'center' },
-      { key: 'descripcion', label: 'Descripción', w: 232, align: 'left' },
-      { key: 'cantidad', label: 'Cant.', w: 40, align: 'center' },
-      { key: 'unidad', label: 'Unidad', w: 60, align: 'center' },
-      { key: 'precioUnitario', label: 'Precio Un.', w: 65, align: 'right' },
-      { key: 'subtotal', label: 'Subtotal', w: 65, align: 'right' },
+      { key: 'renglon', label: '#', w: 22, align: 'center' },
+      { key: 'descripcion', label: 'Descripción', w: 172, align: 'left' },
+      { key: 'modelo', label: 'Modelo', w: 88, align: 'left' },
+      { key: 'cantidad', label: 'Cant.', w: 32, align: 'center' },
+      { key: 'unidad', label: 'Unidad', w: 52, align: 'center' },
+      { key: 'precioUnitario', label: 'Precio Un.', w: 62, align: 'right' },
+      { key: 'subtotal', label: 'Subtotal', w: 62, align: 'right' },
     ];
     const tableW = cols.reduce((s, c) => s + c.w, 0);
 
@@ -114,10 +115,11 @@ function generateQuotePdf({ quote, opportunity }) {
       doc.fillColor('#10101f');
       doc.text(String(item.numRenglon ?? idx + 1), x + 4, y + 6, { width: cols[0].w - 8, align: 'center' }); x += cols[0].w;
       doc.text(item.descripcion || '', x + 4, y + 6, { width: cols[1].w - 8, align: 'left' }); x += cols[1].w;
-      doc.text(String(cantidad), x + 4, y + 6, { width: cols[2].w - 8, align: 'center' }); x += cols[2].w;
-      doc.text(item.unidad || '-', x + 4, y + 6, { width: cols[3].w - 8, align: 'center' }); x += cols[3].w;
-      doc.text(money(precioUnitario), x + 4, y + 6, { width: cols[4].w - 8, align: 'right' }); x += cols[4].w;
-      doc.text(money(subtotal), x + 4, y + 6, { width: cols[5].w - 8, align: 'right' });
+      doc.text(item.modelo || '-', x + 4, y + 6, { width: cols[2].w - 8, align: 'left' }); x += cols[2].w;
+      doc.text(String(cantidad), x + 4, y + 6, { width: cols[3].w - 8, align: 'center' }); x += cols[3].w;
+      doc.text(item.unidad || '-', x + 4, y + 6, { width: cols[4].w - 8, align: 'center' }); x += cols[4].w;
+      doc.text(money(precioUnitario), x + 4, y + 6, { width: cols[5].w - 8, align: 'right' }); x += cols[5].w;
+      doc.text(money(subtotal), x + 4, y + 6, { width: cols[6].w - 8, align: 'right' });
 
       y += rowH;
     });

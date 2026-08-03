@@ -106,7 +106,9 @@ function renderPreview(quote) {
   const rows = quote.items.map(i => `
     <div class="item">
       <div class="desc">${i.numRenglon}. ${escapeHtml(i.descripcion)}</div>
-      <div class="meta">Cantidad: ${i.cantidad} ${escapeHtml(i.unidad || '')}</div>
+      <div class="meta">
+        ${i.modelo ? 'Modelo: ' + escapeHtml(i.modelo) + ' · ' : ''}Cantidad: ${i.cantidad} ${escapeHtml(i.unidad || '')}
+      </div>
       <div class="subtotal">Precio unitario: ${money(i.precioUnitario)} · Subtotal: <b>${money((i.cantidad || 0) * (i.precioUnitario || 0))}</b></div>
     </div>
   `).join('');
