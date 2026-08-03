@@ -3,3 +3,4 @@ node_modules/
 vapid-keys.json
 local-test-server.js
 *.log
+ejemplos/

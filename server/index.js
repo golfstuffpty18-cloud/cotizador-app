@@ -1,13 +1,17 @@
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const multer = require('multer');
 const { pool, init } = require('../shared/db');
 const { generateQuotePdf } = require('../shared/generateQuotePdf');
+const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
+const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ACCESS_CODE = process.env.APP_ACCESS_CODE || '';
 const COOKIE_NAME = 'cotizador_auth';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(express.json());
 app.use(cookieParser());
@@ -96,9 +100,8 @@ function computeTotals(items) {
   return { subtotal, itbm, total: subtotal + itbm };
 }
 
-app.post('/api/opportunities/:id/quote', async (req, res) => {
-  const oppId = req.params.id;
-  const { cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items } = req.body || {};
+async function saveDraft(oppId, data) {
+  const { cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items } = data;
   const safeItems = Array.isArray(items) ? items : [];
   const { subtotal, itbm, total } = computeTotals(safeItems);
 
@@ -122,10 +125,44 @@ app.post('/api/opportunities/:id/quote', async (req, res) => {
     [oppId, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago || 'Crédito', comentarios,
      JSON.stringify(safeItems), subtotal, itbm, total]
   );
+  return rows[0] || null;
+}
 
-  if (!rows.length) return res.status(409).json({ error: 'la cotización ya fue aprobada y no se puede editar' });
-  const { pdf, ...rest } = rows[0];
+app.post('/api/opportunities/:id/quote', async (req, res) => {
+  const row = await saveDraft(req.params.id, req.body || {});
+  if (!row) return res.status(409).json({ error: 'la cotización ya fue aprobada y no se puede editar' });
+  const { pdf, ...rest } = row;
   res.json(rest);
+});
+
+app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
+  const oppId = req.params.id;
+  const { rows: oppRows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [oppId]);
+  if (!oppRows.length) return res.status(404).send('Oportunidad no encontrada');
+  const { rows: quoteRows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [oppId]);
+  const quote = quoteRows[0] || null;
+
+  const buffer = await generateQuoteExcel({ opportunity: oppRows[0], quote });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
+  res.send(buffer);
+});
+
+app.post('/api/opportunities/:id/quote/upload', upload.single('file'), async (req, res) => {
+  const oppId = req.params.id;
+  if (!req.file) return res.status(400).json({ error: 'no se recibió ningún archivo' });
+
+  let parsed;
+  try {
+    parsed = await parseQuoteExcel(req.file.buffer);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const row = await saveDraft(oppId, parsed);
+  if (!row) return res.status(409).json({ error: 'la cotización ya fue aprobada y no se puede editar' });
+  const { pdf, ...rest } = row;
+  res.json({ ...rest, isKnownTemplate: parsed.isKnownTemplate });
 });
 
 app.post('/api/opportunities/:id/quote/approve', async (req, res) => {

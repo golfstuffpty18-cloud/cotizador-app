@@ -33,20 +33,22 @@ function generateQuotePdf({ quote, opportunity }) {
     const marginX = 42;
 
     // ===== Header =====
-    doc.rect(0, 0, pageW, 92).fill(NAVY);
+    const headerH = 136;
+    doc.rect(0, 0, pageW, headerH).fill('#ffffff');
+    doc.rect(0, headerH - 4, pageW, 4).fill(BLUE);
     if (fs.existsSync(LOGO_PATH)) {
-      try { doc.image(LOGO_PATH, marginX, 14, { height: 64 }); } catch (e) {}
+      try { doc.image(LOGO_PATH, marginX, 14, { height: 106 }); } catch (e) {}
     }
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(22)
-      .text('COTIZACIÓN', 0, 30, { align: 'right', width: pageW - marginX });
-    doc.font('Helvetica').fontSize(9).fillColor('#cfd0f5')
-      .text(`Fecha: ${new Date().toLocaleDateString('es-PA')}`, 0, 58, { align: 'right', width: pageW - marginX });
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(22)
+      .text('COTIZACIÓN', 0, 43, { align: 'right', width: pageW - marginX });
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+      .text(`Fecha: ${new Date().toLocaleDateString('es-PA')}`, 0, 71, { align: 'right', width: pageW - marginX });
     if (opportunity && opportunity.act_number) {
-      doc.text(`Proceso PanamaCompra: ${opportunity.act_number}`, 0, 72, { align: 'right', width: pageW - marginX });
+      doc.text(`Proceso PanamaCompra: ${opportunity.act_number}`, 0, 85, { align: 'right', width: pageW - marginX });
     }
 
     // ===== Company block =====
-    let y = 108;
+    let y = headerH + 16;
     doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(11).text(COMPANY.nombre, marginX, y);
     y += 15;
     doc.fillColor(GRAY).font('Helvetica').fontSize(8.5);
