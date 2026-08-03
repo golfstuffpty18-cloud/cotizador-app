@@ -46,6 +46,13 @@ app.post('/api/push/subscribe', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/push/unsubscribe', async (req, res) => {
+  const { endpoint } = req.body || {};
+  if (!endpoint) return res.status(400).json({ error: 'falta endpoint' });
+  await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+  res.json({ ok: true });
+});
+
 app.get('/api/opportunities', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT * FROM opportunities

@@ -5,8 +5,22 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
+const enableBtn = document.getElementById('enableBtn');
+const statusEl = document.getElementById('status');
+
+function setButtonState(active) {
+  if (active) {
+    enableBtn.textContent = 'Desactivar notificaciones';
+    enableBtn.classList.add('active');
+    statusEl.textContent = 'Notificaciones activadas ✅';
+  } else {
+    enableBtn.textContent = 'Activar notificaciones';
+    enableBtn.classList.remove('active');
+    statusEl.textContent = '';
+  }
+}
+
 async function enableNotifications() {
-  const statusEl = document.getElementById('status');
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     statusEl.textContent = 'Este navegador no soporta notificaciones push.';
     return;
@@ -28,29 +42,46 @@ async function enableNotifications() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sub),
     });
-    statusEl.textContent = 'Notificaciones activadas ✅';
-    document.getElementById('enableBtn').style.display = 'none';
+    setButtonState(true);
   } catch (err) {
     statusEl.textContent = 'Error activando notificaciones: ' + err.message;
   }
 }
 
-document.getElementById('enableBtn').addEventListener('click', enableNotifications);
+async function disableNotifications() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (sub) {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint }),
+      });
+      await sub.unsubscribe();
+    }
+    setButtonState(false);
+  } catch (err) {
+    statusEl.textContent = 'Error desactivando notificaciones: ' + err.message;
+  }
+}
+
+enableBtn.addEventListener('click', () => {
+  if (enableBtn.classList.contains('active')) {
+    disableNotifications();
+  } else {
+    enableNotifications();
+  }
+});
 
 async function checkExistingSubscription() {
-  const statusEl = document.getElementById('status');
-  const btn = document.getElementById('enableBtn');
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
     const sub = await reg.pushManager.getSubscription();
-    if (sub && Notification.permission === 'granted') {
-      btn.style.display = 'none';
-      statusEl.textContent = 'Notificaciones activadas ✅';
-    }
+    setButtonState(!!sub && Notification.permission === 'granted');
   } catch (err) {
-    // Silencioso: si falla la verificación, simplemente se deja el botón visible.
+    // Silencioso: si falla la verificación, simplemente se deja el botón en estado "Activar".
   }
 }
 
