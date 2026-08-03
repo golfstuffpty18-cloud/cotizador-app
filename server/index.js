@@ -56,7 +56,8 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 app.get('/api/opportunities', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT * FROM opportunities
-     WHERE deadline IS NULL OR deadline > now()
+     WHERE (deadline IS NULL OR deadline > now())
+       AND decision != 'no_participar'
      ORDER BY created_at DESC LIMIT 100`
   );
   res.json(rows);

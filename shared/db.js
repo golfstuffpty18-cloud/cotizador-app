@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { parseDeadline } = require('./parseWindow');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -46,6 +47,22 @@ WHERE (deadline IS NOT NULL AND deadline < now())
 
 async function init() {
   await pool.query(SCHEMA);
+  await backfillDeadlines();
+}
+
+// Fixes rows created before the `deadline` column existed (or where parsing
+// failed at insert time) by re-parsing their stored window_info text.
+async function backfillDeadlines() {
+  const { rows } = await pool.query(
+    `SELECT id, window_info FROM opportunities WHERE deadline IS NULL AND window_info IS NOT NULL`
+  );
+  for (const row of rows) {
+    const deadline = parseDeadline(row.window_info);
+    if (deadline) {
+      await pool.query('UPDATE opportunities SET deadline = $1 WHERE id = $2', [deadline, row.id]);
+    }
+  }
+  return rows.length;
 }
 
 async function cleanupExpired() {
