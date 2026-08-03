@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS opportunities (
   entity TEXT,
   reference_price NUMERIC,
   window_info TEXT,
+  deadline TIMESTAMPTZ,
   category_match BOOLEAN NOT NULL,
   recommendation TEXT NOT NULL,
   reasoning TEXT NOT NULL,
@@ -33,10 +34,23 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   auth TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
+`;
+
+const CLEANUP = `
+DELETE FROM opportunities
+WHERE (deadline IS NOT NULL AND deadline < now())
+   OR (deadline IS NULL AND created_at < now() - interval '5 days');
 `;
 
 async function init() {
   await pool.query(SCHEMA);
 }
 
-module.exports = { pool, init };
+async function cleanupExpired() {
+  const { rowCount } = await pool.query(CLEANUP);
+  return rowCount;
+}
+
+module.exports = { pool, init, cleanupExpired };

@@ -1,9 +1,10 @@
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const webpush = require('web-push');
-const { pool, init } = require('../shared/db');
+const { pool, init, cleanupExpired } = require('../shared/db');
 const pc = require('../shared/panamacompra');
 const { evaluate } = require('../shared/evaluate');
+const { parseDeadline } = require('../shared/parseWindow');
 
 const SUBJECT_RE = /Solicitud de cotizaci[oó]n en l[ií]nea\s*-\s*([\w-]+)/i;
 
@@ -47,10 +48,10 @@ async function alreadyKnown(actNumber) {
 async function saveOpportunity(op) {
   await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, reference_price, window_info, category_match, recommendation, reasoning, decision, email_uid)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10)
+      (act_number, convocatoria, title, entity, reference_price, window_info, deadline, category_match, recommendation, reasoning, decision, email_uid)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11)
      ON CONFLICT (act_number, convocatoria) DO NOTHING`,
-    [op.actNumber, op.convocatoria, op.title, op.entity, op.referencePrice, op.windowInfo,
+    [op.actNumber, op.convocatoria, op.title, op.entity, op.referencePrice, op.windowInfo, op.deadline,
      op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
   );
 }
@@ -87,6 +88,9 @@ async function notifySubscribers(op) {
 async function main() {
   await init();
 
+  const deleted = await cleanupExpired();
+  if (deleted > 0) console.log(`Oportunidades vencidas eliminadas: ${deleted}`);
+
   const emails = await fetchCandidateEmails();
   console.log(`Correos candidatos encontrados: ${emails.length}`);
 
@@ -114,6 +118,7 @@ async function main() {
         const title = campos['Título'] || r.titulo;
         const entity = campos['Entidad'] || '';
         const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
+        const deadline = parseDeadline(windowInfo);
 
         const ev = evaluate({ title, referencePrice });
 
@@ -124,6 +129,7 @@ async function main() {
           entity,
           referencePrice,
           windowInfo,
+          deadline,
           categoryMatch: ev.categoryMatch,
           recommendation: ev.recommendation,
           reasoning: ev.reasoning,

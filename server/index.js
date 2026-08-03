@@ -48,7 +48,9 @@ app.post('/api/push/subscribe', async (req, res) => {
 
 app.get('/api/opportunities', async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT * FROM opportunities ORDER BY created_at DESC LIMIT 100'
+    `SELECT * FROM opportunities
+     WHERE deadline IS NULL OR deadline > now()
+     ORDER BY created_at DESC LIMIT 100`
   );
   res.json(rows);
 });
