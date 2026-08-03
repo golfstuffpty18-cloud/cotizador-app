@@ -1,4 +1,8 @@
 const ExcelJS = require('exceljs');
+const fs = require('fs');
+const path = require('path');
+
+const LOGO_PATH = path.join(__dirname, 'assets', 'logo.png');
 
 const NAVY = 'FF0A0A1A';
 const LIGHT = 'FFF5F6FB';
@@ -39,8 +43,15 @@ async function generateQuoteExcel({ opportunity, quote }) {
   ];
 
   // ===== Header =====
-  sheet.mergeCells('A1:L3');
-  const header = sheet.getCell('A1');
+  if (fs.existsSync(LOGO_PATH)) {
+    try {
+      const imageId = wb.addImage({ filename: LOGO_PATH, extension: 'png' });
+      sheet.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 90, height: 90 } });
+    } catch (e) { /* si falla la imagen, el resto de la plantilla se genera igual */ }
+  }
+
+  sheet.mergeCells('C1:L3');
+  const header = sheet.getCell('C1');
   header.value = 'COTIZACIÓN';
   header.font = { size: 22, bold: true, color: { argb: NAVY } };
   header.alignment = { vertical: 'middle', horizontal: 'right' };
@@ -79,9 +90,12 @@ async function generateQuoteExcel({ opportunity, quote }) {
   sheet.getRow(r).height = 30;
   r++;
 
+  const BLANK_ROWS = 15;
   const items = (quote && quote.items && quote.items.length)
     ? quote.items
-    : (opportunity && opportunity.items) || [];
+    : (opportunity && opportunity.items && opportunity.items.length)
+      ? opportunity.items
+      : Array.from({ length: BLANK_ROWS }, (_, i) => ({ numRenglon: i + 1, descripcion: '', modelo: '', cantidad: '' }));
 
   const firstItemRow = r;
   items.forEach((item, idx) => {
