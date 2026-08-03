@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS opportunities (
   convocatoria TEXT,
   title TEXT NOT NULL,
   entity TEXT,
+  entity_address TEXT,
+  entity_province TEXT,
   reference_price NUMERIC,
   window_info TEXT,
   deadline TIMESTAMPTZ,
@@ -60,6 +62,8 @@ CREATE TABLE IF NOT EXISTS quotes (
 
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_province TEXT;
 `;
 
 const CLEANUP = `

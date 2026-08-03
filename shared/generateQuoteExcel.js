@@ -62,8 +62,8 @@ async function generateQuoteExcel({ opportunity, quote }) {
   sectionLabel(sheet, `A${r}`, 'CLIENTE'); r++;
   labeledRow(sheet, r, 'Nombre / Entidad:', (quote && quote.cliente_nombre) || (opportunity && opportunity.entity) || ''); r++;
   labeledRow(sheet, r, 'RUC:', (quote && quote.cliente_ruc) || ''); r++;
-  labeledRow(sheet, r, 'Dirección:', (quote && quote.cliente_direccion) || ''); r++;
-  labeledRow(sheet, r, 'Ciudad:', (quote && quote.cliente_ciudad) || 'Panamá'); r++;
+  labeledRow(sheet, r, 'Dirección:', (quote && quote.cliente_direccion) || (opportunity && opportunity.entity_address) || ''); r++;
+  labeledRow(sheet, r, 'Ciudad:', (quote && quote.cliente_ciudad) || (opportunity && opportunity.entity_province) || 'Panamá'); r++;
   labeledRow(sheet, r, 'Forma de pago:', (quote && quote.forma_pago) || 'Crédito'); r++;
   r += 1;
 

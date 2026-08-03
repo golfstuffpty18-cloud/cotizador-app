@@ -48,10 +48,10 @@ async function alreadyKnown(actNumber) {
 async function saveOpportunity(op) {
   await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12)
+      (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14)
      ON CONFLICT (act_number, convocatoria) DO NOTHING`,
-    [op.actNumber, op.convocatoria, op.title, op.entity, op.referencePrice, op.windowInfo, op.deadline,
+    [op.actNumber, op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice, op.windowInfo, op.deadline,
      JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
   );
 }
@@ -117,6 +117,8 @@ async function main() {
         const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
         const title = campos['Título'] || r.titulo;
         const entity = campos['Entidad'] || '';
+        const entityAddress = campos['Dirección de la unidad de compra'] || '';
+        const entityProvince = campos['Provincia'] || '';
         const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
         const deadline = parseDeadline(windowInfo);
 
@@ -127,6 +129,8 @@ async function main() {
           convocatoria: String(r.numeroConvocatoria),
           title,
           entity,
+          entityAddress,
+          entityProvince,
           referencePrice,
           windowInfo,
           deadline,
