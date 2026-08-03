@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de equipos | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<style>
+  :root{
+    --blue:#1616e6; --navy:#0a0a1a;
+    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--gray-50); color:#10101f; }
+  header{ background:var(--navy); color:#fff; padding:16px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
+  header h1{ font-size:.95rem; margin:0; font-weight:700; }
+
+  main{ padding:16px; max-width:720px; margin:0 auto 80px; }
+  section{ background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 10px 24px -16px rgba(10,10,26,.2); }
+  h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:0 0 14px; }
+
+  label{ display:block; font-size:.76rem; font-weight:600; color:var(--navy); margin-bottom:4px; }
+  input, select, textarea{
+    width:100%; padding:9px 11px; border-radius:8px; border:2px solid var(--gray-100);
+    font-size:.85rem; font-family:inherit; margin-bottom:10px;
+  }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--blue); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+  .btn{ padding:11px 16px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.85rem; cursor:pointer; }
+  .btn-primary{ background:var(--blue); color:#fff; width:100%; }
+  .btn-ghost{ background:#fff; border-color:var(--gray-100); color:var(--navy); }
+  .btn-danger{ background:#fbe9e7; color:#c0392b; border:none; font-size:.75rem; padding:6px 12px; }
+
+  .filters{ display:flex; gap:10px; margin-bottom:14px; }
+  .filters input, .filters select{ margin-bottom:0; }
+
+  .catalog-item{ border:2px solid var(--gray-100); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .catalog-item .desc{ font-weight:700; font-size:.86rem; color:var(--navy); margin-bottom:4px; }
+  .catalog-item .meta{ font-size:.76rem; color:var(--gray-600); margin-bottom:6px; }
+  .catalog-item .price{ font-size:.86rem; color:var(--blue); font-weight:700; }
+  .catalog-item .actions{ display:flex; justify-content:flex-end; margin-top:6px; }
+  .badge-cat{ display:inline-block; background:var(--gray-50); color:var(--gray-600); font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:999px; margin-right:6px; }
+
+  .empty{ text-align:center; color:var(--gray-400); padding:30px 10px; font-size:.85rem; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">←</a>
+  <h1>Catálogo de equipos</h1>
+</header>
+
+<main id="app">Cargando…</main>
+
+<script src="/catalog.js"></script>
+</body>
+</html>

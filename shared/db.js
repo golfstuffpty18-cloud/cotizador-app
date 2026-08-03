@@ -60,6 +60,21 @@ CREATE TABLE IF NOT EXISTS quotes (
   UNIQUE(opportunity_id)
 );
 
+CREATE TABLE IF NOT EXISTS catalog_items (
+  id SERIAL PRIMARY KEY,
+  descripcion TEXT NOT NULL,
+  categoria TEXT,
+  marca TEXT,
+  modelo TEXT,
+  costo_distribuidor NUMERIC,
+  margen_g NUMERIC,
+  proveedor TEXT,
+  fecha_cotizacion TIMESTAMPTZ,
+  notas TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;

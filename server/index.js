@@ -6,6 +6,7 @@ const { pool, init } = require('../shared/db');
 const { generateQuotePdf } = require('../shared/generateQuotePdf');
 const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
+const { suggestPricesForItems, upsertFromQuoteItems } = require('../shared/catalog');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -142,7 +143,12 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
   const { rows: quoteRows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [oppId]);
   const quote = quoteRows[0] || null;
 
-  const buffer = await generateQuoteExcel({ opportunity: oppRows[0], quote });
+  const opportunity = oppRows[0];
+  const baseItems = (quote && quote.items && quote.items.length) ? quote.items : (opportunity.items || []);
+  const suggestedItems = await suggestPricesForItems(baseItems);
+  const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
+
+  const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
   res.send(buffer);
@@ -181,6 +187,12 @@ app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
     [pdfBuffer, oppId]
   );
 
+  try {
+    await upsertFromQuoteItems(quote.items || []);
+  } catch (err) {
+    console.error('No se pudo actualizar el catálogo:', err.message);
+  }
+
   res.json({ ok: true, estado: 'aprobada' });
 });
 
@@ -190,6 +202,50 @@ app.get('/api/opportunities/:id/quote/pdf', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="cotizacion-${req.params.id}.pdf"`);
   res.send(rows[0].pdf);
+});
+
+const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Otro'];
+
+app.get('/api/catalog/categorias', (req, res) => res.json(CATEGORIAS));
+
+app.get('/api/catalog', async (req, res) => {
+  const { categoria, search } = req.query;
+  const clauses = [];
+  const params = [];
+  if (categoria) { params.push(categoria); clauses.push(`categoria = $${params.length}`); }
+  if (search) { params.push(`%${search}%`); clauses.push(`descripcion ILIKE $${params.length}`); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const { rows } = await pool.query(`SELECT * FROM catalog_items ${where} ORDER BY updated_at DESC LIMIT 300`, params);
+  res.json(rows);
+});
+
+app.post('/api/catalog', async (req, res) => {
+  const { descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
+  if (!descripcion) return res.status(400).json({ error: 'falta descripción' });
+  const { rows } = await pool.query(
+    `INSERT INTO catalog_items (descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas, fecha_cotizacion)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now()) RETURNING *`,
+    [descripcion, categoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null]
+  );
+  res.json(rows[0]);
+});
+
+app.put('/api/catalog/:id', async (req, res) => {
+  const { descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE catalog_items SET
+       descripcion = COALESCE($1, descripcion), categoria = $2, marca = $3, modelo = $4,
+       costo_distribuidor = $5, margen_g = $6, proveedor = $7, notas = $8, updated_at = now()
+     WHERE id = $9 RETURNING *`,
+    [descripcion, categoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
+app.delete('/api/catalog/:id', async (req, res) => {
+  await pool.query('DELETE FROM catalog_items WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
 });
 
 init()
