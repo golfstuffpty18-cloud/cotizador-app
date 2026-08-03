@@ -8,33 +8,40 @@ participar o no se toma en la app.
 ## Arquitectura
 
 - **cotizador-web** (Render Web Service, gratis): sirve la PWA y la API REST.
-- **cotizador-check-email** (Render Cron Job, gratis): corre cada hora L-V 7am-4pm
-  (hora de Panamá), revisa el correo, consulta PanamaCompra y envía notificaciones push.
 - **cotizador-db** (Render PostgreSQL, gratis): almacena oportunidades y suscripciones push.
+- **GitHub Actions** (gratis): workflow programado (`.github/workflows/check-email.yml`)
+  que corre cada hora L-V 7am-4pm (hora de Panamá), revisa el correo, consulta
+  PanamaCompra y envía las notificaciones push. Se usa GitHub Actions en vez de un Render
+  Cron Job porque los Cron Jobs de Render no tienen plan gratuito (mínimo ~$1/mes).
 
 ## Variables de entorno requeridas
 
-### Ambos servicios (web y cron)
+### Render — cotizador-web
 - `DATABASE_URL` — la asigna Render automáticamente al vincular la base de datos.
 - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` — generadas con `npm run gen-vapid`.
-
-### Solo el cron job
-- `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_HOST`, `IMAP_PORT` — credenciales del correo (GoDaddy).
-- `PC_USUARIO`, `PC_CONTRASENA` — credenciales de proveedor en PanamaCompra.
-- `VAPID_SUBJECT` — `mailto:tu-correo@dominio.com`
-
-### Solo el web service
 - `APP_ACCESS_CODE` — PIN numérico para entrar a la app (protege el acceso público).
 
-## Despliegue en Render
+### GitHub — Secrets del repositorio (Settings → Secrets and variables → Actions)
+- `DATABASE_URL` — la **External Database URL** de `cotizador-db` (Render → base de datos → Connections).
+- `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_HOST`, `IMAP_PORT` — credenciales del correo (GoDaddy).
+- `PC_USUARIO`, `PC_CONTRASENA` — credenciales de proveedor en PanamaCompra.
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` — las mismas que en Render.
+- `VAPID_SUBJECT` — `mailto:tu-correo@dominio.com`
+
+## Despliegue
 
 1. Sube este proyecto a un repositorio de GitHub.
 2. En Render: **New > Blueprint**, conecta el repo. Render detecta `render.yaml` y crea
-   los 3 recursos automáticamente.
-3. Completa las variables de entorno marcadas `sync: false` en el dashboard de cada servicio.
-4. Al terminar el primer deploy, abre la URL del servicio web, ingresa tu PIN y toca
-   "Activar notificaciones" desde tu celular (agrega la página a la pantalla de inicio
-   para que se sienta como app).
+   el web service y la base de datos.
+3. Completa las variables de entorno marcadas `sync: false` en el dashboard del web service.
+4. Copia la **External Database URL** de `cotizador-db` (pestaña Connections de la base de datos).
+5. En GitHub → Settings → Secrets and variables → Actions, agrega todos los secrets listados
+   arriba (incluyendo esa External Database URL).
+6. El workflow corre automáticamente según el horario. También puedes dispararlo manualmente
+   desde la pestaña **Actions** del repo (`workflow_dispatch`) para probarlo de inmediato.
+7. Abre la URL del servicio web desde tu celular, ingresa tu PIN y toca
+   "Activar notificaciones" (agrega la página a la pantalla de inicio para que se sienta
+   como app).
 
 ## Desarrollo local
 
