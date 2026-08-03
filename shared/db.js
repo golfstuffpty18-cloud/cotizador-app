@@ -1,0 +1,42 @@
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false },
+});
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS opportunities (
+  id SERIAL PRIMARY KEY,
+  act_number TEXT NOT NULL,
+  convocatoria TEXT,
+  title TEXT NOT NULL,
+  entity TEXT,
+  reference_price NUMERIC,
+  window_info TEXT,
+  category_match BOOLEAN NOT NULL,
+  recommendation TEXT NOT NULL,
+  reasoning TEXT NOT NULL,
+  decision TEXT NOT NULL DEFAULT 'pending',
+  email_uid INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at TIMESTAMPTZ,
+  UNIQUE(act_number, convocatoria)
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id SERIAL PRIMARY KEY,
+  endpoint TEXT UNIQUE NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+`;
+
+async function init() {
+  await pool.query(SCHEMA);
+}
+
+module.exports = { pool, init };

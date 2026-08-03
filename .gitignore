@@ -1,0 +1,5 @@
+node_modules/
+.env
+vapid-keys.json
+local-test-server.js
+*.log

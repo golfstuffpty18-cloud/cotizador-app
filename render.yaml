@@ -1,0 +1,55 @@
+databases:
+  - name: cotizador-db
+    plan: free
+    databaseName: cotizador
+    user: cotizador
+
+services:
+  - type: web
+    name: cotizador-web
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cotizador-db
+          property: connectionString
+      - key: APP_ACCESS_CODE
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+
+  - type: cron
+    name: cotizador-check-email
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run check
+    schedule: "0 12-21 * * 1-5"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cotizador-db
+          property: connectionString
+      - key: IMAP_USER
+        sync: false
+      - key: IMAP_PASSWORD
+        sync: false
+      - key: IMAP_HOST
+        sync: false
+      - key: IMAP_PORT
+        sync: false
+      - key: PC_USUARIO
+        sync: false
+      - key: PC_CONTRASENA
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false

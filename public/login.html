@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingresar | Cotizador GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  :root{ --blue:#1616e6; --navy:#0a0a1a; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(circle at 70% 0%, #0d0d9e 0%, var(--navy) 60%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 24px;
+  }
+  .card{ background:#fff; border-radius:18px; padding:32px 28px; max-width:360px; width:100%; box-shadow:0 30px 60px -20px rgba(0,0,0,.5); text-align:center; }
+  img{ width:80px; margin-bottom:16px; }
+  h1{ font-size:1.2rem; color:var(--navy); margin:0 0 20px; }
+  input{ width:100%; padding:14px; border-radius:10px; border:2px solid #eee; font-size:1.4rem; text-align:center; letter-spacing:4px; margin-bottom:16px; }
+  input:focus{ outline:none; border-color:var(--blue); }
+  button{ width:100%; padding:14px; border:none; border-radius:999px; background:var(--blue); color:#fff; font-weight:700; font-size:1rem; cursor:pointer; }
+  #err{ color:#c0392b; font-size:.85rem; margin-top:10px; min-height:1.2em; }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <img src="/icons/icon-192.png" alt="">
+    <h1>Cotizador GS Technologies</h1>
+    <input type="password" id="code" inputmode="numeric" placeholder="••••" autofocus>
+    <button type="submit">Ingresar</button>
+    <div id="err"></div>
+  </form>
+<script>
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('code').value;
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  if (res.ok) {
+    location.href = '/';
+  } else {
+    document.getElementById('err').textContent = 'Código incorrecto';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function enableNotifications() {
+  const statusEl = document.getElementById('status');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    statusEl.textContent = 'Este navegador no soporta notificaciones push.';
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      statusEl.textContent = 'Permiso de notificaciones denegado.';
+      return;
+    }
+    const { publicKey } = await fetch('/api/vapid-public-key').then(r => r.json());
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub),
+    });
+    statusEl.textContent = 'Notificaciones activadas ✅';
+    document.getElementById('enableBtn').style.display = 'none';
+  } catch (err) {
+    statusEl.textContent = 'Error activando notificaciones: ' + err.message;
+  }
+}
+
+document.getElementById('enableBtn').addEventListener('click', enableNotifications);
+
+function fmtDate(d) {
+  return new Date(d).toLocaleString('es-PA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+async function decide(id, decision, btnEl) {
+  const res = await fetch(`/api/opportunities/${id}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision }),
+  });
+  if (res.ok) loadOpportunities();
+}
+
+function card(op) {
+  const rec = op.recommendation;
+  const recLabel = rec === 'participar' ? 'Participar' : rec === 'no_participar' ? 'No participar' : 'Revisar';
+  const price = op.reference_price != null ? `B/. ${Number(op.reference_price).toLocaleString('es-PA', { minimumFractionDigits: 2 })}` : 'No indicado';
+
+  const div = document.createElement('div');
+  div.className = `card ${rec}`;
+  div.innerHTML = `
+    <span class="badge ${rec}">${recLabel}</span>
+    <div class="act">${op.act_number} — Convocatoria ${op.convocatoria || '-'}</div>
+    <div class="title">${op.title}</div>
+    <div class="entity">${op.entity || ''}</div>
+    <div class="meta">
+      <span><b>Precio ref.:</b> ${price}</span>
+      <span><b>Ventana:</b> ${op.window_info || 'No indicada'}</span>
+    </div>
+    <div class="reasoning">${op.reasoning}</div>
+    <div class="actions">
+      <button class="yes ${op.decision === 'participar' ? 'active' : ''}">Sí, participar</button>
+      <button class="no ${op.decision === 'no_participar' ? 'active' : ''}">No participar</button>
+    </div>
+  `;
+  div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));
+  div.querySelector('.no').addEventListener('click', () => decide(op.id, 'no_participar'));
+  return div;
+}
+
+async function loadOpportunities() {
+  const list = document.getElementById('list');
+  const res = await fetch('/api/opportunities');
+  const items = await res.json();
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">Aún no hay oportunidades detectadas.<br>Te avisaremos por notificación en cuanto aparezca una.</div>';
+    return;
+  }
+  items.forEach(op => list.appendChild(card(op)));
+}
+
+loadOpportunities();
