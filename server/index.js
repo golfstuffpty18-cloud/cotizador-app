@@ -7,7 +7,7 @@ const { generateQuotePdf } = require('../shared/generateQuotePdf');
 const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems } = require('../shared/catalog');
-const { runCheckEmailJob } = require('../shared/checkEmailJob');
+const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 function requireAuth(req, res, next) {
-  if (req.path === '/api/cron/check-email') return next(); // tiene su propia llave secreta
+  if (req.path.startsWith('/api/cron/')) return next(); // tienen su propia llave secreta
   if (!ACCESS_CODE) return next(); // no code configured -> open (local/dev only)
   if (req.cookies[COOKIE_NAME] === ACCESS_CODE) return next();
   if (req.path === '/login.html' || req.path === '/api/login' || req.path.startsWith('/icons/') || req.path === '/manifest.json' || req.path === '/sw.js') {
@@ -216,6 +216,25 @@ app.all('/api/cron/check-email', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Error en /api/cron/check-email:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.all('/api/cron/test-push', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+  try {
+    const { rows: subs } = await pool.query('SELECT id, created_at FROM push_subscriptions');
+    const payload = JSON.stringify({
+      title: '🔔 Prueba manual',
+      body: `Notificación de prueba — ${new Date().toLocaleString('es-PA')}`,
+      url: '/',
+    });
+    const results = await sendPushToAll(payload);
+    res.json({ ok: true, subscriberCount: subs.length, subscriptions: subs, results });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
