@@ -74,6 +74,30 @@ enableBtn.addEventListener('click', () => {
   }
 });
 
+const searchBtn = document.getElementById('searchBtn');
+if (searchBtn) {
+  searchBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (searchBtn.dataset.loading === '1') return;
+    searchBtn.dataset.loading = '1';
+    const original = searchBtn.textContent;
+    searchBtn.textContent = '⏳';
+    statusEl.textContent = 'Buscando en PanamaCompra por rubro… puede tardar unos segundos.';
+    try {
+      const res = await fetch('/api/search/panamacompra', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error en la búsqueda');
+      statusEl.textContent = `Búsqueda lista: ${data.nuevas} nueva(s) de ${data.candidatas} candidata(s) por rubro (${data.totalAbiertas} abiertas en total).`;
+      await loadOpportunities();
+    } catch (err) {
+      statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
+    } finally {
+      searchBtn.textContent = original;
+      searchBtn.dataset.loading = '';
+    }
+  });
+}
+
 async function checkExistingSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {

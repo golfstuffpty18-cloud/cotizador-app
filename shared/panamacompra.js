@@ -50,6 +50,25 @@ async function buscarProcesoCualquierEstado(cookie, numProceso) {
   return [];
 }
 
+// Trae en una sola llamada todos los procesos de cotización actualmente
+// "Abierta" (no filtrados por número de proceso), para poder buscar
+// manualmente por rubro entre todo lo que hay publicado ahora mismo en
+// PanamaCompra, sin depender de que llegue el correo de aviso.
+async function buscarAbiertas(cookie, registrosPorPagina = 500) {
+  const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
+    method: 'POST',
+    headers: { ...COMMON_HEADERS, Cookie: cookie },
+    body: JSON.stringify({
+      registrosPorPagina,
+      valorSiguiente: '',
+      filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado: ESTADO.ABIERTA, numProceso: '' },
+    }),
+  });
+  if (!res.ok) throw new Error(`Búsqueda de abiertas falló: HTTP ${res.status}`);
+  const json = await res.json();
+  return json.result.registros || [];
+}
+
 async function verPliego(cookie, idProcesosContratacionFlujos) {
   const res = await fetch(
     `${BASE}/procesos-configuracion/pagina-componentes/2/procesoVistaPliego/${idProcesosContratacionFlujos}`,
@@ -91,4 +110,4 @@ function extraerPrecio(texto) {
   return m ? parseFloat(m[1]) : null;
 }
 
-module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, verPliego, extraerPrecio, ESTADO };
+module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarAbiertas, verPliego, extraerPrecio, ESTADO };

@@ -2,6 +2,7 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const webpush = require('web-push');
 const { pool, init, cleanupExpired, isActProcessed, markActProcessed, hasBeenAlerted, markAlerted } = require('./db');
+const { upsertOpportunity } = require('./opportunities');
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
 const { parseDeadline } = require('./parseWindow');
@@ -63,38 +64,11 @@ async function fetchCandidateEmails() {
   return found;
 }
 
-// Si ya existe un placeholder para este acto (creado por la alerta inmediata,
-// sin convocatoria todavía), lo completa con los datos del portal. Si no,
-// inserta una fila nueva. Devuelve true si hay que notificar (fila nueva o
-// placeholder recién completado), false si esta convocatoria ya existía.
+// Devuelve true si hay que notificar (fila nueva o placeholder recién
+// completado), false si esta convocatoria ya existía.
 async function saveOpportunity(op) {
-  const { rows: placeholder } = await pool.query(
-    `SELECT id FROM opportunities WHERE act_number = $1 AND convocatoria IS NULL LIMIT 1`,
-    [op.actNumber]
-  );
-  if (placeholder.length) {
-    await pool.query(
-      `UPDATE opportunities SET
-         convocatoria = $1, title = $2, entity = $3, entity_address = $4, entity_province = $5,
-         reference_price = $6, window_info = $7, deadline = $8, items = $9,
-         category_match = $10, recommendation = $11, reasoning = $12, email_uid = $13
-       WHERE id = $14`,
-      [op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice,
-       op.windowInfo, op.deadline, JSON.stringify(op.items || []), op.categoryMatch, op.recommendation,
-       op.reasoning, op.emailUid, placeholder[0].id]
-    );
-    return true;
-  }
-
-  const { rowCount } = await pool.query(
-    `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14)
-     ON CONFLICT (act_number, convocatoria) DO NOTHING`,
-    [op.actNumber, op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice, op.windowInfo, op.deadline,
-     JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid]
-  );
-  return rowCount > 0;
+  const row = await upsertOpportunity(op);
+  return !!row;
 }
 
 // Fila visible de inmediato en la app apenas se detecta el correo, antes de

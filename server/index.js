@@ -8,6 +8,7 @@ const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems } = require('../shared/catalog');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
+const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -216,6 +217,16 @@ app.all('/api/cron/check-email', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Error en /api/cron/check-email:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/search/panamacompra', async (req, res) => {
+  try {
+    const result = await searchOpenByCategory();
+    res.json(result);
+  } catch (err) {
+    console.error('Error en búsqueda manual de PanamaCompra:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
