@@ -71,6 +71,12 @@ CREATE TABLE IF NOT EXISTS processed_acts (
   processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS email_alerts (
+  act_number TEXT PRIMARY KEY,
+  subject TEXT,
+  alerted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS catalog_items (
   id SERIAL PRIMARY KEY,
   descripcion TEXT NOT NULL,
@@ -147,4 +153,20 @@ async function markActProcessed(actNumber) {
   );
 }
 
-module.exports = { pool, init, cleanupExpired, isActProcessed, markActProcessed };
+// email_alerts: marca que ya se envió el aviso inmediato al detectar el correo,
+// independiente de si el proceso ya está publicado en el portal de PanamaCompra
+// (eso lo controla processed_acts). Así evitamos reenviar el aviso inmediato en
+// cada ciclo mientras se espera a que el portal publique el acto.
+async function hasBeenAlerted(actNumber) {
+  const { rows } = await pool.query('SELECT 1 FROM email_alerts WHERE act_number = $1', [actNumber]);
+  return rows.length > 0;
+}
+
+async function markAlerted(actNumber, subject) {
+  await pool.query(
+    'INSERT INTO email_alerts (act_number, subject) VALUES ($1,$2) ON CONFLICT (act_number) DO NOTHING',
+    [actNumber, subject]
+  );
+}
+
+module.exports = { pool, init, cleanupExpired, isActProcessed, markActProcessed, hasBeenAlerted, markAlerted };

@@ -1,11 +1,27 @@
 const { ImapFlow } = require('imapflow');
+const { simpleParser } = require('mailparser');
 const webpush = require('web-push');
-const { pool, init, cleanupExpired, isActProcessed, markActProcessed } = require('./db');
+const { pool, init, cleanupExpired, isActProcessed, markActProcessed, hasBeenAlerted, markAlerted } = require('./db');
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
 const { parseDeadline } = require('./parseWindow');
 
 const SUBJECT_RE = /Solicitud de cotizaci[oó]n en l[ií]nea\s*-\s*([\w-]+)/i;
+const ENTITY_RE = /entidad\s+([\s\S]+?)\s*,\s*ha publicado/i;
+const WINDOW_RE = /abierta el d[ií]a\s+([\d/]+)\s+en horario de\s+([\d:apmAPM\s]+?)\s+a\s+([\d:apmAPM\s]+?)\.?\s*(?:\r?\n|$)/i;
+
+// Extrae del cuerpo del correo (no del portal) la entidad y la ventana de
+// tiempo, si PanamaCompra las incluyó en el mensaje. Esto es lo que permite
+// avisar de inmediato al detectar el correo, sin depender de que el proceso
+// ya esté publicado en el portal.
+function parseEmailBody(text) {
+  const entityMatch = (text || '').match(ENTITY_RE);
+  const windowMatch = (text || '').match(WINDOW_RE);
+  return {
+    entityFromEmail: entityMatch ? entityMatch[1].replace(/\s+/g, ' ').trim() : null,
+    windowFromEmail: windowMatch ? `${windowMatch[1].trim()} ${windowMatch[2].trim().replace(/\s+/g, ' ')} - ${windowMatch[3].trim().replace(/\s+/g, ' ')}` : null,
+  };
+}
 
 async function fetchCandidateEmails() {
   const client = new ImapFlow({
@@ -23,11 +39,22 @@ async function fetchCandidateEmails() {
     const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // last 3 days, DB dedupes
     for await (const msg of client.fetch(
       { since, from: 'panamacompras.gob.pa' },
-      { envelope: true, uid: true }
+      { envelope: true, uid: true, source: true }
     )) {
       const subject = msg.envelope.subject || '';
       const m = subject.match(SUBJECT_RE);
-      if (m) found.push({ uid: msg.uid, actNumber: m[1], subject });
+      if (!m) continue;
+
+      let entityFromEmail = null;
+      let windowFromEmail = null;
+      try {
+        const parsed = await simpleParser(msg.source);
+        ({ entityFromEmail, windowFromEmail } = parseEmailBody(parsed.text));
+      } catch (err) {
+        // si falla el parseo del cuerpo, seguimos solo con lo que da el asunto
+      }
+
+      found.push({ uid: msg.uid, actNumber: m[1], subject, entityFromEmail, windowFromEmail });
     }
   } finally {
     lock.release();
@@ -36,8 +63,29 @@ async function fetchCandidateEmails() {
   return found;
 }
 
-// Devuelve true solo si de verdad insertó una fila nueva (no si ya existía).
+// Si ya existe un placeholder para este acto (creado por la alerta inmediata,
+// sin convocatoria todavía), lo completa con los datos del portal. Si no,
+// inserta una fila nueva. Devuelve true si hay que notificar (fila nueva o
+// placeholder recién completado), false si esta convocatoria ya existía.
 async function saveOpportunity(op) {
+  const { rows: placeholder } = await pool.query(
+    `SELECT id FROM opportunities WHERE act_number = $1 AND convocatoria IS NULL LIMIT 1`,
+    [op.actNumber]
+  );
+  if (placeholder.length) {
+    await pool.query(
+      `UPDATE opportunities SET
+         convocatoria = $1, title = $2, entity = $3, entity_address = $4, entity_province = $5,
+         reference_price = $6, window_info = $7, deadline = $8, items = $9,
+         category_match = $10, recommendation = $11, reasoning = $12, email_uid = $13
+       WHERE id = $14`,
+      [op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice,
+       op.windowInfo, op.deadline, JSON.stringify(op.items || []), op.categoryMatch, op.recommendation,
+       op.reasoning, op.emailUid, placeholder[0].id]
+    );
+    return true;
+  }
+
   const { rowCount } = await pool.query(
     `INSERT INTO opportunities
       (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid)
@@ -49,7 +97,27 @@ async function saveOpportunity(op) {
   return rowCount > 0;
 }
 
-async function notifySubscribers(op) {
+// Fila visible de inmediato en la app apenas se detecta el correo, antes de
+// saber si el proceso ya está publicado en el portal de PanamaCompra.
+// convocatoria queda NULL a propósito: es la marca de "placeholder" que
+// saveOpportunity() busca para completar esta misma fila más tarde.
+async function insertPlaceholderOpportunity(e) {
+  await pool.query(
+    `INSERT INTO opportunities
+      (act_number, convocatoria, title, entity, window_info, category_match, recommendation, reasoning, decision, email_uid)
+     VALUES ($1, NULL, $2, $3, $4, false, 'revisar', $5, 'pending', $6)`,
+    [
+      e.actNumber,
+      'Nueva solicitud de cotización — detalles del proceso pendientes de PanamaCompra',
+      e.entityFromEmail,
+      e.windowFromEmail,
+      'Detectado por correo; buscando ítems y precio de referencia en el portal de PanamaCompra.',
+      e.uid,
+    ]
+  );
+}
+
+async function sendPushToAll(payload) {
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT || 'mailto:d.sanchezv@gstechnologiespty.com',
     process.env.VAPID_PUBLIC_KEY,
@@ -57,13 +125,6 @@ async function notifySubscribers(op) {
   );
 
   const { rows: subs } = await pool.query('SELECT * FROM push_subscriptions');
-  const icon = op.recommendation === 'participar' ? '✅' : op.recommendation === 'no_participar' ? '⛔' : '🔎';
-  const payload = JSON.stringify({
-    title: `${icon} ${op.actNumber}`,
-    body: `${op.title}\n${op.entity} — B/. ${op.referencePrice ?? '?'}\nRecomendación: ${op.recommendation.replace('_', ' ')}`,
-    url: '/',
-  });
-
   for (const sub of subs) {
     const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
     try {
@@ -76,6 +137,30 @@ async function notifySubscribers(op) {
       }
     }
   }
+}
+
+async function notifyImmediateAlert(e) {
+  const bodyLines = [];
+  if (e.entityFromEmail) bodyLines.push(e.entityFromEmail);
+  if (e.windowFromEmail) bodyLines.push(`Ventana: ${e.windowFromEmail}`);
+  bodyLines.push('Buscando el resto de los detalles en PanamaCompra…');
+
+  const payload = JSON.stringify({
+    title: `📩 Nueva solicitud: ${e.actNumber}`,
+    body: bodyLines.join('\n'),
+    url: '/',
+  });
+  await sendPushToAll(payload);
+}
+
+async function notifySubscribers(op) {
+  const icon = op.recommendation === 'participar' ? '✅' : op.recommendation === 'no_participar' ? '⛔' : '🔎';
+  const payload = JSON.stringify({
+    title: `${icon} ${op.actNumber}`,
+    body: `${op.title}\n${op.entity} — B/. ${op.referencePrice ?? '?'}\nRecomendación: ${op.recommendation.replace('_', ' ')}`,
+    url: '/',
+  });
+  await sendPushToAll(payload);
 }
 
 let running = false;
@@ -96,6 +181,24 @@ async function runCheckEmailJob() {
 
     const emails = await fetchCandidateEmails();
     push(`Correos candidatos encontrados: ${emails.length}`);
+
+    // Alerta inmediata: avisar apenas se detecta el correo, sin esperar a que
+    // PanamaCompra publique el proceso en su portal. Se dispara una sola vez
+    // por acto (email_alerts) y no si ese acto ya fue procesado por completo
+    // antes (p. ej. un reenvío de PanamaCompra de algo ya resuelto).
+    const seenForAlert = new Set();
+    let alerted = 0;
+    for (const e of emails) {
+      if (seenForAlert.has(e.actNumber)) continue;
+      seenForAlert.add(e.actNumber);
+      if (await hasBeenAlerted(e.actNumber)) continue;
+      if (await isActProcessed(e.actNumber)) continue;
+      await insertPlaceholderOpportunity(e);
+      await notifyImmediateAlert(e);
+      await markAlerted(e.actNumber, e.subject);
+      alerted++;
+      push(`Alerta inmediata enviada: ${e.actNumber}`);
+    }
 
     // Un mismo acto puede llegar en más de un correo (reenvíos/recordatorios
     // de PanamaCompra); nos quedamos con uno solo por acto antes de procesar.
@@ -162,7 +265,7 @@ async function runCheckEmailJob() {
       }
     }
 
-    return { ok: true, emailsFound: emails.length, newActs: newActNumbers.length, saved, deleted, log };
+    return { ok: true, emailsFound: emails.length, alerted, newActs: newActNumbers.length, saved, deleted, log };
   } finally {
     running = false;
   }

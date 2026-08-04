@@ -102,14 +102,15 @@ async function decide(id, decision, btnEl) {
 
 function card(op) {
   const rec = op.recommendation;
-  const recLabel = rec === 'participar' ? 'Participar' : rec === 'no_participar' ? 'No participar' : 'Revisar';
+  const isPlaceholder = !op.convocatoria; // detectado por correo, aún sin detalles del portal
+  const recLabel = isPlaceholder ? 'Detectado' : rec === 'participar' ? 'Participar' : rec === 'no_participar' ? 'No participar' : 'Revisar';
   const price = op.reference_price != null ? `B/. ${Number(op.reference_price).toLocaleString('es-PA', { minimumFractionDigits: 2 })}` : 'No indicado';
 
   const div = document.createElement('div');
   div.className = `card ${rec}`;
   div.innerHTML = `
     <span class="badge ${rec}">${recLabel}</span>
-    <div class="act">${op.act_number} — Convocatoria ${op.convocatoria || '-'}</div>
+    <div class="act">${op.act_number}${op.convocatoria ? ` — Convocatoria ${op.convocatoria}` : ''}</div>
     <div class="title">${op.title}</div>
     <div class="entity">${op.entity || ''}</div>
     <div class="meta">
@@ -117,14 +118,17 @@ function card(op) {
       <span><b>Ventana:</b> ${op.window_info || 'No indicada'}</span>
     </div>
     <div class="reasoning">${op.reasoning}</div>
+    ${isPlaceholder ? '' : `
     <div class="actions">
       <button class="yes ${op.decision === 'participar' ? 'active' : ''}">Sí, participar</button>
       <button class="no ${op.decision === 'no_participar' ? 'active' : ''}">No participar</button>
     </div>
-    ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}
+    ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}`}
   `;
-  div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));
-  div.querySelector('.no').addEventListener('click', () => decide(op.id, 'no_participar'));
+  if (!isPlaceholder) {
+    div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));
+    div.querySelector('.no').addEventListener('click', () => decide(op.id, 'no_participar'));
+  }
   return div;
 }
 
