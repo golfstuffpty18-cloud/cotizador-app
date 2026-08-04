@@ -1,9 +1,20 @@
+// "camara"/"cámara" y "humo" sueltos generaban falsos positivos (equipo
+// médico: "cámara" endoscópica, "humo" de evacuación quirúrgica), sobre todo
+// en la búsqueda manual que revisa TODAS las cotizaciones abiertas del
+// gobierno, no solo las que ya llegaron filtradas por correo. Se
+// reemplazaron por frases más específicas; el resto de la lista se deja
+// igual porque no ha dado falsos positivos.
 const MATCH_KEYWORDS = [
-  'camara', 'cámara', 'cctv', 'videovigilancia', 'video vigilancia',
+  'camara de seguridad', 'cámara de seguridad', 'camara de vigilancia', 'cámara de vigilancia',
+  'camaras de seguridad', 'cámaras de seguridad', 'camaras de vigilancia', 'cámaras de vigilancia',
+  'camara ip', 'cámara ip', 'camaras ip', 'cámaras ip', 'camara ptz', 'cámara ptz', 'camara ir', 'cámara ir',
+  'sistema de camaras', 'sistema de cámaras', 'circuito cerrado de television', 'circuito cerrado de televisión',
+  'cctv', 'videovigilancia', 'video vigilancia',
   'alarma', 'intrusion', 'intrusión', 'sensor de movimiento',
   'control de acceso', 'biometri', 'torniquete', 'cerradura electr',
   'deteccion de incendio', 'detección de incendio', 'contra incendio',
-  'humo', 'panel de alarma contra incendio',
+  'detector de humo', 'deteccion de humo', 'detección de humo', 'sensor de humo', 'alarma de humo',
+  'panel de alarma contra incendio',
   'automatizacion', 'automatización', 'domotica', 'domótica',
   'cableado estructurado', 'voz y datos', 'red de datos', 'punto de red',
   'seguridad electronica', 'seguridad electrónica',
