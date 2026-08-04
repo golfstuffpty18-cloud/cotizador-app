@@ -1,10 +1,9 @@
 name: Revisar correo de cotizaciones
 
 on:
-  schedule:
-    # GitHub retrasa o descarta corridas justo en punto de hora (mayor carga);
-    # se corre en el minuto :07 para evitar ese congestionamiento.
-    - cron: "7 12-21 * * 1-5"
+  # El horario automático real ahora lo maneja cron-job.org llamando a
+  # /api/cron/check-email (24/7, ciclo corto) — el schedule de GitHub Actions
+  # demostró no ser confiable. Este workflow se deja solo para disparo manual.
   workflow_dispatch: {}
 
 jobs:
