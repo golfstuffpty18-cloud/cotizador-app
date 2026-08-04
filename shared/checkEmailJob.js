@@ -67,7 +67,7 @@ async function notifySubscribers(op) {
   for (const sub of subs) {
     const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
     try {
-      await webpush.sendNotification(subscription, payload);
+      await webpush.sendNotification(subscription, payload, { urgency: 'high', TTL: 3600 });
     } catch (err) {
       if (err.statusCode === 404 || err.statusCode === 410) {
         await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint]);
