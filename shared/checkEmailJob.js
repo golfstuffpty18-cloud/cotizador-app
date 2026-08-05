@@ -31,6 +31,12 @@ async function fetchCandidateEmails() {
     secure: true,
     auth: { user: process.env.IMAP_USER, pass: process.env.IMAP_PASSWORD },
     logger: false,
+    // Los valores por defecto de imapflow (90s/16s/5min) son demasiado
+    // generosos para un job que corre cada pocos minutos: si el correo de
+    // GoDaddy no responde, mejor fallar rápido que dejar el chequeo colgado.
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
   });
 
   await client.connect();
@@ -143,6 +149,21 @@ async function notifySubscribers(op) {
   await sendPushToAll(payload);
 }
 
+// Tope duro para el chequeo completo. Sin esto, si algo se cuelga en algún
+// punto (IMAP, PanamaCompra, el envío de push) sin lanzar un error nunca,
+// running se queda en true para siempre y ningún ciclo futuro de
+// cron-job.org vuelve a correr hasta que Render reinicie el servidor — eso
+// fue justamente lo que causó cortes de horas en las notificaciones.
+const JOB_TIMEOUT_MS = 90000;
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Tiempo de espera agotado (${ms / 1000}s) en: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 let running = false;
 
 async function runCheckEmailJob() {
@@ -154,101 +175,109 @@ async function runCheckEmailJob() {
   const push = (msg) => { log.push(msg); console.log(msg); };
 
   try {
-    await init();
-
-    const deleted = await cleanupExpired();
-    if (deleted > 0) push(`Oportunidades vencidas eliminadas: ${deleted}`);
-
-    const emails = await fetchCandidateEmails();
-    push(`Correos candidatos encontrados: ${emails.length}`);
-
-    // Alerta inmediata: avisar apenas se detecta el correo, sin esperar a que
-    // PanamaCompra publique el proceso en su portal. Se dispara una sola vez
-    // por acto (email_alerts) y no si ese acto ya fue procesado por completo
-    // antes (p. ej. un reenvío de PanamaCompra de algo ya resuelto).
-    const seenForAlert = new Set();
-    let alerted = 0;
-    for (const e of emails) {
-      if (seenForAlert.has(e.actNumber)) continue;
-      seenForAlert.add(e.actNumber);
-      if (await hasBeenAlerted(e.actNumber)) continue;
-      if (await isActProcessed(e.actNumber)) continue;
-      await insertPlaceholderOpportunity(e);
-      await notifyImmediateAlert(e);
-      await markAlerted(e.actNumber, e.subject);
-      alerted++;
-      push(`Alerta inmediata enviada: ${e.actNumber}`);
-    }
-
-    // Un mismo acto puede llegar en más de un correo (reenvíos/recordatorios
-    // de PanamaCompra); nos quedamos con uno solo por acto antes de procesar.
-    const seenActNumbers = new Set();
-    const newActNumbers = [];
-    for (const e of emails) {
-      if (seenActNumbers.has(e.actNumber)) continue;
-      if (await isActProcessed(e.actNumber)) continue;
-      seenActNumbers.add(e.actNumber);
-      newActNumbers.push(e);
-    }
-    push(`Actos nuevos a evaluar: ${newActNumbers.length}`);
-
-    let saved = 0;
-    if (newActNumbers.length > 0) {
-      const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-
-      for (const e of newActNumbers) {
-        try {
-          const registros = await pc.buscarProcesoCualquierEstado(cookie, e.actNumber);
-          if (!registros.length) {
-            push(`Sin registros en PanamaCompra para ${e.actNumber} (aún no visible en portal)`);
-            continue;
-          }
-
-          for (const r of registros) {
-            const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
-            const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
-            const title = campos['Título'] || r.titulo;
-            const entity = campos['Entidad'] || '';
-            const entityAddress = campos['Dirección de la unidad de compra'] || '';
-            const entityProvince = campos['Provincia'] || '';
-            const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
-            const deadline = parseDeadline(windowInfo);
-
-            const ev = evaluate({ title, referencePrice });
-
-            const op = {
-              actNumber: e.actNumber,
-              convocatoria: String(r.numeroConvocatoria),
-              title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, items,
-              categoryMatch: ev.categoryMatch,
-              recommendation: ev.recommendation,
-              reasoning: ev.reasoning,
-              emailUid: e.uid,
-            };
-
-            const inserted = await saveOpportunity(op);
-            if (inserted) {
-              await notifySubscribers(op);
-              saved++;
-              push(`Guardado y notificado: ${op.actNumber} conv.${op.convocatoria} -> ${op.recommendation}`);
-            } else {
-              push(`Ya existía, no se vuelve a notificar: ${op.actNumber} conv.${op.convocatoria}`);
-            }
-          }
-
-          // Ya se procesó por completo este acto: no volver a mirarlo aunque
-          // luego se borre de "opportunities" por vencido.
-          await markActProcessed(e.actNumber);
-        } catch (err) {
-          push(`Error procesando ${e.actNumber}: ${err.message}`);
-        }
-      }
-    }
-
-    return { ok: true, emailsFound: emails.length, alerted, newActs: newActNumbers.length, saved, deleted, log };
+    const result = await withTimeout(runCheckEmailJobInner(push), JOB_TIMEOUT_MS, 'chequeo de correo completo');
+    return { ...result, log };
+  } catch (err) {
+    push(`Error/tiempo agotado en el chequeo: ${err.message}`);
+    return { ok: false, error: err.message, log };
   } finally {
     running = false;
   }
+}
+
+async function runCheckEmailJobInner(push) {
+  await init();
+
+  const deleted = await cleanupExpired();
+  if (deleted > 0) push(`Oportunidades vencidas eliminadas: ${deleted}`);
+
+  const emails = await fetchCandidateEmails();
+  push(`Correos candidatos encontrados: ${emails.length}`);
+
+  // Alerta inmediata: avisar apenas se detecta el correo, sin esperar a que
+  // PanamaCompra publique el proceso en su portal. Se dispara una sola vez
+  // por acto (email_alerts) y no si ese acto ya fue procesado por completo
+  // antes (p. ej. un reenvío de PanamaCompra de algo ya resuelto).
+  const seenForAlert = new Set();
+  let alerted = 0;
+  for (const e of emails) {
+    if (seenForAlert.has(e.actNumber)) continue;
+    seenForAlert.add(e.actNumber);
+    if (await hasBeenAlerted(e.actNumber)) continue;
+    if (await isActProcessed(e.actNumber)) continue;
+    await insertPlaceholderOpportunity(e);
+    await notifyImmediateAlert(e);
+    await markAlerted(e.actNumber, e.subject);
+    alerted++;
+    push(`Alerta inmediata enviada: ${e.actNumber}`);
+  }
+
+  // Un mismo acto puede llegar en más de un correo (reenvíos/recordatorios
+  // de PanamaCompra); nos quedamos con uno solo por acto antes de procesar.
+  const seenActNumbers = new Set();
+  const newActNumbers = [];
+  for (const e of emails) {
+    if (seenActNumbers.has(e.actNumber)) continue;
+    if (await isActProcessed(e.actNumber)) continue;
+    seenActNumbers.add(e.actNumber);
+    newActNumbers.push(e);
+  }
+  push(`Actos nuevos a evaluar: ${newActNumbers.length}`);
+
+  let saved = 0;
+  if (newActNumbers.length > 0) {
+    const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
+
+    for (const e of newActNumbers) {
+      try {
+        const registros = await pc.buscarProcesoCualquierEstado(cookie, e.actNumber);
+        if (!registros.length) {
+          push(`Sin registros en PanamaCompra para ${e.actNumber} (aún no visible en portal)`);
+          continue;
+        }
+
+        for (const r of registros) {
+          const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
+          const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
+          const title = campos['Título'] || r.titulo;
+          const entity = campos['Entidad'] || '';
+          const entityAddress = campos['Dirección de la unidad de compra'] || '';
+          const entityProvince = campos['Provincia'] || '';
+          const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
+          const deadline = parseDeadline(windowInfo);
+
+          const ev = evaluate({ title, referencePrice });
+
+          const op = {
+            actNumber: e.actNumber,
+            convocatoria: String(r.numeroConvocatoria),
+            title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, items,
+            categoryMatch: ev.categoryMatch,
+            recommendation: ev.recommendation,
+            reasoning: ev.reasoning,
+            emailUid: e.uid,
+          };
+
+          const inserted = await saveOpportunity(op);
+          if (inserted) {
+            await notifySubscribers(op);
+            saved++;
+            push(`Guardado y notificado: ${op.actNumber} conv.${op.convocatoria} -> ${op.recommendation}`);
+          } else {
+            push(`Ya existía, no se vuelve a notificar: ${op.actNumber} conv.${op.convocatoria}`);
+          }
+        }
+
+        // Ya se procesó por completo este acto: no volver a mirarlo aunque
+        // luego se borre de "opportunities" por vencido.
+        await markActProcessed(e.actNumber);
+      } catch (err) {
+        push(`Error procesando ${e.actNumber}: ${err.message}`);
+      }
+    }
+  }
+
+  return { ok: true, emailsFound: emails.length, alerted, newActs: newActNumbers.length, saved, deleted };
 }
 
 module.exports = { runCheckEmailJob, sendPushToAll };

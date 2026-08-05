@@ -10,6 +10,12 @@ const COMMON_HEADERS = {
 const ESTADO = { ABIERTA: 8, CERRADA: 9, CANCELADO: 4, PROGRAMADA: 15 };
 const TIPO_PROCESO_COTIZACION = 2;
 
+// Sin esto, una llamada a PanamaCompra que nunca responde deja colgado el
+// chequeo de correo para siempre: fetch() de Node no tiene timeout por
+// defecto, así que un solo request atascado bloquea (running=true) todos
+// los ciclos siguientes de cron-job.org hasta que Render reinicie el server.
+const FETCH_TIMEOUT_MS = 20000;
+
 function parseSetCookies(res) {
   const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
   return raw.map(c => c.split(';')[0]).join('; ');
@@ -20,6 +26,7 @@ async function login(usuario, contrasena) {
     method: 'POST',
     headers: COMMON_HEADERS,
     body: JSON.stringify({ usuario, contrasena }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Login falló: HTTP ${res.status}`);
   const cookie = parseSetCookies(res);
@@ -36,6 +43,7 @@ async function buscarProceso(cookie, numProceso, idEstado) {
       valorSiguiente: '',
       filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado, numProceso },
     }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Búsqueda falló: HTTP ${res.status}`);
   const json = await res.json();
@@ -70,6 +78,7 @@ async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
         valorSiguiente: '',
         filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado, numProceso: '' },
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`Búsqueda (idEstado=${idEstado}) falló: HTTP ${res.status}`);
     const json = await res.json();
@@ -81,7 +90,7 @@ async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
 async function verPliego(cookie, idProcesosContratacionFlujos) {
   const res = await fetch(
     `${BASE}/procesos-configuracion/pagina-componentes/2/procesoVistaPliego/${idProcesosContratacionFlujos}`,
-    { headers: { ...COMMON_HEADERS, Cookie: cookie } }
+    { headers: { ...COMMON_HEADERS, Cookie: cookie }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
   );
   if (!res.ok) throw new Error(`Ver pliego falló: HTTP ${res.status}`);
   const json = await res.json();
