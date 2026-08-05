@@ -33,7 +33,8 @@ const LABELS = {
 };
 
 // Columnas: A Renglón | B Descripción | C Modelo | D Unidades |
-// E Costo Distribuidor | F Costo+ITBM | G Gasto | H %G | I Precio Un. | J Subtotal | K ITBM | L Suma
+// E Costo Distribuidor | F Costo+ITBM | G Gasto | H %G | I Precio Un. | J Subtotal | K ITBM | L Suma |
+// M Precio de Referencia (PanamaCompra)
 async function parseQuoteExcel(buffer) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -77,6 +78,7 @@ async function parseQuoteExcel(buffer) {
       costoDistribuidor: cellValueNumber(row.getCell(5)),
       margenG: cellValueNumber(row.getCell(8)),
       precioUnitario: cellValueNumber(row.getCell(9)),
+      precioReferencia: cellValueNumber(row.getCell(13)),
     });
   }
 

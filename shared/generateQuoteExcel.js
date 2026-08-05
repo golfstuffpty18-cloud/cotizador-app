@@ -40,6 +40,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
     { width: 6 }, { width: 34 }, { width: 16 }, { width: 9 },
     { width: 13 }, { width: 13 }, { width: 12 }, { width: 7 },
     { width: 11 }, { width: 11 }, { width: 10 }, { width: 11 },
+    { width: 14 },
   ];
 
   // ===== Header =====
@@ -79,7 +80,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
   r += 1;
 
   // ===== Items table =====
-  const headers = ['Renglón', 'Descripción', 'Modelo del Equipo', 'Unidades', 'COSTO DE DISTRIBUIDOR', 'COSTO DISTRIBUIDOR +ITBM', 'GASTO TOTAL', '%G', 'Precio Un.', 'Subtotal', 'ITBM', 'Suma'];
+  const headers = ['Renglón', 'Descripción', 'Modelo del Equipo', 'Unidades', 'COSTO DE DISTRIBUIDOR', 'COSTO DISTRIBUIDOR +ITBM', 'GASTO TOTAL', '%G', 'Precio Un.', 'Subtotal', 'ITBM', 'Suma', 'Precio de Referencia (PanamaCompra)'];
   headers.forEach((h, i) => {
     const cell = sheet.getCell(r, i + 1);
     cell.value = h;
@@ -120,8 +121,10 @@ async function generateQuoteExcel({ opportunity, quote }) {
     row.getCell(10).value = { formula: `PRODUCT(I${r},D${r})`, result: 0 };
     row.getCell(11).value = { formula: `PRODUCT(J${r},0.07)`, result: 0 };
     row.getCell(12).value = { formula: `SUM(J${r},K${r})`, result: 0 };
+    row.getCell(13).value = item.precioReferencia != null ? item.precioReferencia : null; // dato informativo de PanamaCompra, no se edita
+    row.getCell(13).font = { italic: true, size: 8.5, color: { argb: 'FF565873' } };
 
-    [6, 7, 9, 10, 11, 12].forEach(c => { row.getCell(c).numFmt = '"B/. "#,##0.00'; });
+    [6, 7, 9, 10, 11, 12, 13].forEach(c => { row.getCell(c).numFmt = '"B/. "#,##0.00'; });
     row.getCell(5).numFmt = '"B/. "#,##0.00';
 
     // Highlight the two cells the user actually needs to fill in.
@@ -145,7 +148,93 @@ async function generateQuoteExcel({ opportunity, quote }) {
   r += 1;
   totalLine(sheet, r, 'SUBTOTAL', `SUM(J${firstItemRow}:J${lastItemRow})`); const subtotalRow = r; r++;
   totalLine(sheet, r, 'ITBM (7%)', `J${subtotalRow}*0.07`); const itbmRow = r; r++;
-  totalLine(sheet, r, 'TOTAL COTIZACIÓN', `J${subtotalRow}+J${itbmRow}`, true); r++;
+  totalLine(sheet, r, 'TOTAL COTIZACIÓN', `J${subtotalRow}+J${itbmRow}`, true); const totalRow = r; r++;
+
+  // ===== Verificación contra el precio de referencia de PanamaCompra =====
+  r += 2;
+  sectionLabel(sheet, `A${r}`, 'VERIFICACIÓN DE PRECIO DE REFERENCIA'); r++;
+  totalLine(sheet, r, 'Suma "Precio de Referencia" de los ítems', `SUM(M${firstItemRow}:M${lastItemRow})`); const refSumRow = r; r++;
+
+  const refPrecioSistema = (opportunity && opportunity.reference_price != null) ? Number(opportunity.reference_price) : null;
+  if (refPrecioSistema != null) {
+    totalLine(sheet, r, 'Precio de referencia del sistema (PanamaCompra)', String(refPrecioSistema)); const refSistemaRow = r; r++;
+    totalLine(sheet, r, 'Diferencia', `J${refSumRow}-J${refSistemaRow}`); const refDiffRow = r; r++;
+
+    sheet.mergeCells(r, 1, r, 9);
+    const checkLabel = sheet.getCell(r, 1);
+    checkLabel.value = 'Verificación';
+    checkLabel.font = { bold: true, size: 10, color: { argb: 'FF565873' } };
+    checkLabel.alignment = { horizontal: 'right' };
+    sheet.mergeCells(r, 10, r, 13);
+    const checkCell = sheet.getCell(r, 10);
+    checkCell.value = { formula: `IF(ROUND(J${refDiffRow},2)=0,"✓ Coincide con el precio de referencia","⚠ No coincide con el precio de referencia")` };
+    checkCell.font = { bold: true, size: 10 };
+    const checkRow = r;
+    r++;
+
+    sheet.addConditionalFormatting({
+      ref: `J${checkRow}:M${checkRow}`,
+      rules: [
+        { type: 'containsText', operator: 'containsText', text: '✓', style: { font: { color: { argb: 'FF1FA971' }, bold: true } } },
+        { type: 'containsText', operator: 'containsText', text: '⚠', style: { font: { color: { argb: 'FFC0392B' }, bold: true } } },
+      ],
+    });
+  } else {
+    sheet.mergeCells(r, 1, r, 13);
+    const noRef = sheet.getCell(r, 1);
+    noRef.value = 'PanamaCompra no indicó un precio de referencia total para este proceso — no hay con qué comparar.';
+    noRef.font = { italic: true, size: 9, color: { argb: 'FF8A8CA3' } };
+    r++;
+  }
+
+  // ===== Análisis de rentabilidad (gasto vs. ganancia, con barras nativas de Excel) =====
+  r += 2;
+  sectionLabel(sheet, `A${r}`, 'ANÁLISIS DE RENTABILIDAD'); r++;
+  totalLine(sheet, r, 'Gasto total', `SUM(G${firstItemRow}:G${lastItemRow})`); const gastoTotalRow = r; r++;
+  totalLine(sheet, r, 'Precio final (total cotización)', `J${totalRow}`); const precioFinalRow = r; r++;
+  totalLine(sheet, r, 'Ganancia', `J${precioFinalRow}-J${gastoTotalRow}`, true); const gananciaRow = r; r++;
+  totalLine(sheet, r, 'Ganancia % sobre el costo', `J${gananciaRow}/J${gastoTotalRow}`, false, '0.0%'); r++;
+
+  r += 1;
+  sectionLabel(sheet, `A${r}`, 'Composición del precio: gasto vs. ganancia'); r++;
+  const compGastoRow = r;
+  totalLine(sheet, r, 'Gasto total', `J${gastoTotalRow}`); r++;
+  const compGananciaRow = r;
+  totalLine(sheet, r, 'Ganancia', `J${gananciaRow}`); r++;
+
+  r += 1;
+  sectionLabel(sheet, `A${r}`, 'Precio final por % de ganancia estipulado (mismo gasto total)'); r++;
+  const tierRows = [];
+  [0, 10, 20, 30, 40, 50].forEach(pct => {
+    tierRows.push(r);
+    totalLine(sheet, r, `${pct}% de ganancia`, `J${gastoTotalRow}*${1 + pct / 100}`);
+    r++;
+  });
+  const tier50Row = tierRows[tierRows.length - 1];
+  const actualRow = r;
+  totalLine(sheet, r, 'ACTUAL (tu cotización)', `J${precioFinalRow}`, true);
+  r++;
+
+  // Barras nativas de Excel (dataBar): todas comparten la misma escala
+  // 0 -> valor del 50% de ganancia, que nunca se supera porque el dropdown
+  // %G del Excel tiene tope 1.5 (50%). Así las barras son comparables entre sí.
+  const barConfig = [
+    { row: compGastoRow, color: 'FF1616E6' },
+    { row: compGananciaRow, color: 'FF1FA971' },
+    ...tierRows.map(row => ({ row, color: 'FF8A8CA3' })),
+    { row: actualRow, color: 'FF1FA971' },
+  ];
+  barConfig.forEach(({ row, color }) => {
+    sheet.addConditionalFormatting({
+      ref: `J${row}:J${row}`,
+      rules: [{
+        type: 'dataBar',
+        cfvo: [{ type: 'num', value: 0 }, { type: 'formula', value: `$J$${tier50Row}` }],
+        color: { argb: color },
+        minLength: 0, maxLength: 100, showValue: true, gradient: false, border: false,
+      }],
+    });
+  });
 
   r += 2;
   sectionLabel(sheet, `A${r}`, 'COMENTARIOS'); r++;
@@ -156,7 +245,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
 
   sheet.mergeCells(`A${r}:L${r}`);
   const note = sheet.getCell(`A${r}`);
-  note.value = 'Instrucciones: complete "COSTO DE DISTRIBUIDOR" y "%G" (resaltados) por cada ítem — el resto se calcula solo. Guarde el archivo y súbalo de nuevo en la app. El PDF final para el cliente solo mostrará Descripción, Modelo, Unidades, Precio Un. y Subtotal.';
+  note.value = 'Instrucciones: complete "COSTO DE DISTRIBUIDOR" y "%G" (resaltados) por cada ítem — el resto, incluyendo la verificación del precio de referencia y el análisis de rentabilidad de abajo, se calcula solo. Guarde el archivo y súbalo de nuevo en la app. El PDF final para el cliente solo mostrará Descripción, Modelo, Unidades, Precio Un. y Subtotal (no el análisis interno).';
   note.font = { italic: true, size: 8, color: { argb: '8A8CA3' } };
   note.alignment = { wrapText: true };
 
@@ -185,7 +274,7 @@ function labeledRow(sheet, r, label, value) {
   v.font = { size: 9 };
 }
 
-function totalLine(sheet, r, label, formula, bold) {
+function totalLine(sheet, r, label, formula, bold, numFmt) {
   sheet.mergeCells(r, 1, r, 9);
   const l = sheet.getCell(r, 1);
   l.value = label;
@@ -194,7 +283,7 @@ function totalLine(sheet, r, label, formula, bold) {
 
   const v = sheet.getCell(r, 10);
   v.value = { formula };
-  v.numFmt = '"B/. "#,##0.00';
+  v.numFmt = numFmt || '"B/. "#,##0.00';
   v.font = { bold: true, size: bold ? 12 : 10, color: { argb: bold ? 'FF1616E6' : 'FF565873' } };
   if (bold) v.border = { top: { style: 'medium', color: { argb: 'FF1616E6' } } };
 }
