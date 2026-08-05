@@ -34,9 +34,11 @@ async function fetchCandidateEmails() {
     // Los valores por defecto de imapflow (90s/16s/5min) son demasiado
     // generosos para un job que corre cada pocos minutos: si el correo de
     // GoDaddy no responde, mejor fallar rápido que dejar el chequeo colgado.
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 30000,
+    // (15s resultó ser insuficiente en la práctica — Render tarda más que
+    // eso en conectar a GoDaddy incluso cuando la conexión sí funciona.)
+    connectionTimeout: 45000,
+    greetingTimeout: 20000,
+    socketTimeout: 40000,
   });
 
   await client.connect();
@@ -154,7 +156,7 @@ async function notifySubscribers(op) {
 // running se queda en true para siempre y ningún ciclo futuro de
 // cron-job.org vuelve a correr hasta que Render reinicie el servidor — eso
 // fue justamente lo que causó cortes de horas en las notificaciones.
-const JOB_TIMEOUT_MS = 90000;
+const JOB_TIMEOUT_MS = 120000;
 
 function withTimeout(promise, ms, label) {
   let timer;
