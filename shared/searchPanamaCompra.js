@@ -9,13 +9,13 @@ const { upsertOpportunity } = require('./opportunities');
 // coincidencias de rubro entre las abiertas.
 const MAX_DETALLES = 30;
 
-// Busca, entre TODAS las cotizaciones actualmente "Abierta" en PanamaCompra
-// (no solo las que avisaron por correo), las que coinciden con el rubro de
-// la empresa, y las guarda en el mismo listado que usan las detectadas por
-// correo. Complementa al chequeo de correo — no lo reemplaza.
+// Busca, entre TODAS las cotizaciones "Abierta" o "Programada" en
+// PanamaCompra (no solo las que avisaron por correo), las que coinciden con
+// el rubro de la empresa, y las guarda en el mismo listado que usan las
+// detectadas por correo. Complementa al chequeo de correo — no lo reemplaza.
 async function searchOpenByCategory() {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-  const registros = await pc.buscarAbiertas(cookie);
+  const registros = await pc.buscarPorEstados(cookie, [pc.ESTADO.ABIERTA, pc.ESTADO.PROGRAMADA]);
 
   const candidatas = registros.filter(r => evaluate({ title: r.titulo }).categoryMatch);
 
@@ -52,7 +52,7 @@ async function searchOpenByCategory() {
   }
 
   return {
-    totalAbiertas: registros.length,
+    totalConsultadas: registros.length,
     candidatas: candidatas.length,
     revisadas,
     nuevas: nuevas.length,

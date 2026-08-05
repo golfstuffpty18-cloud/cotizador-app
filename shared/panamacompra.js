@@ -7,7 +7,7 @@ const COMMON_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
 };
 
-const ESTADO = { ABIERTA: 8, CERRADA: 9, CANCELADO: 4 };
+const ESTADO = { ABIERTA: 8, CERRADA: 9, CANCELADO: 4, PROGRAMADA: 15 };
 const TIPO_PROCESO_COTIZACION = 2;
 
 function parseSetCookies(res) {
@@ -42,31 +42,40 @@ async function buscarProceso(cookie, numProceso, idEstado) {
   return json.result.registros || [];
 }
 
+// "Programada" primero: cuando un proceso recién se publica, PanamaCompra
+// suele mandar el correo de aviso mientras el proceso todavía está en este
+// estado (ventana de cotización aún no abierta), y solo más tarde pasa a
+// "Abierta". Buscar Programada primero evita el retraso de minutos/horas que
+// había antes esperando a que el proceso apareciera como Abierta.
 async function buscarProcesoCualquierEstado(cookie, numProceso) {
-  for (const idEstado of [ESTADO.ABIERTA, ESTADO.CERRADA, ESTADO.CANCELADO]) {
+  for (const idEstado of [ESTADO.PROGRAMADA, ESTADO.ABIERTA, ESTADO.CERRADA, ESTADO.CANCELADO]) {
     const registros = await buscarProceso(cookie, numProceso, idEstado);
     if (registros.length) return registros;
   }
   return [];
 }
 
-// Trae en una sola llamada todos los procesos de cotización actualmente
-// "Abierta" (no filtrados por número de proceso), para poder buscar
-// manualmente por rubro entre todo lo que hay publicado ahora mismo en
-// PanamaCompra, sin depender de que llegue el correo de aviso.
-async function buscarAbiertas(cookie, registrosPorPagina = 500) {
-  const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
-    method: 'POST',
-    headers: { ...COMMON_HEADERS, Cookie: cookie },
-    body: JSON.stringify({
-      registrosPorPagina,
-      valorSiguiente: '',
-      filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado: ESTADO.ABIERTA, numProceso: '' },
-    }),
-  });
-  if (!res.ok) throw new Error(`Búsqueda de abiertas falló: HTTP ${res.status}`);
-  const json = await res.json();
-  return json.result.registros || [];
+// Trae en una sola llamada todos los procesos de cotización en los estados
+// pedidos (no filtrados por número de proceso), para poder buscar
+// manualmente por rubro entre todo lo publicado en PanamaCompra (abierto y
+// programado), sin depender de que llegue el correo de aviso.
+async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
+  const todos = [];
+  for (const idEstado of estados) {
+    const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
+      method: 'POST',
+      headers: { ...COMMON_HEADERS, Cookie: cookie },
+      body: JSON.stringify({
+        registrosPorPagina,
+        valorSiguiente: '',
+        filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado, numProceso: '' },
+      }),
+    });
+    if (!res.ok) throw new Error(`Búsqueda (idEstado=${idEstado}) falló: HTTP ${res.status}`);
+    const json = await res.json();
+    todos.push(...(json.result.registros || []));
+  }
+  return todos;
 }
 
 async function verPliego(cookie, idProcesosContratacionFlujos) {
@@ -110,4 +119,4 @@ function extraerPrecio(texto) {
   return m ? parseFloat(m[1]) : null;
 }
 
-module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarAbiertas, verPliego, extraerPrecio, ESTADO };
+module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, verPliego, extraerPrecio, ESTADO };
