@@ -6,7 +6,8 @@ const { pool, init } = require('../shared/db');
 const { generateQuotePdf } = require('../shared/generateQuotePdf');
 const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
-const { suggestPricesForItems, upsertFromQuoteItems } = require('../shared/catalog');
+const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
+const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
 
@@ -148,7 +149,7 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
 
   const opportunity = oppRows[0];
   const baseItems = (quote && quote.items && quote.items.length) ? quote.items : (opportunity.items || []);
-  const suggestedItems = await suggestPricesForItems(baseItems);
+  const suggestedItems = await suggestPricesForItems(baseItems, opportunity.category);
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
@@ -250,9 +251,29 @@ app.all('/api/cron/test-push', async (req, res) => {
   }
 });
 
-const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Otro'];
+const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Materiales', 'Otro'];
 
 app.get('/api/catalog/categorias', (req, res) => res.json(CATEGORIAS));
+
+// Importación masiva desde un Excel de precios "libre" (lista propia del
+// usuario o de un proveedor, no la plantilla de cotización). `categoria` en
+// el body es opcional: se usa para las filas que no traigan su propia
+// columna de categoría — útil cuando el archivo entero es de un solo rubro
+// (ej. "materiales.xlsx" con tuberías, cajas, tapas, conectores...).
+app.post('/api/catalog/import', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'no se recibió ningún archivo' });
+
+  let parsed;
+  try {
+    parsed = await parseCatalogExcel(req.file.buffer);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const defaultCategoria = (req.body && req.body.categoria) || (req.query && req.query.categoria) || null;
+  const resumen = await importCatalogRows(parsed.rows, { defaultCategoria });
+  res.json({ ok: true, ...resumen });
+});
 
 app.get('/api/catalog', async (req, res) => {
   const { categoria, search } = req.query;

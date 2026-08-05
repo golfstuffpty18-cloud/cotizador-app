@@ -96,6 +96,7 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_province TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS category TEXT;
 `;
 
 const CLEANUP = `

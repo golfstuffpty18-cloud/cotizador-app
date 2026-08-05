@@ -255,6 +255,7 @@ async function runCheckEmailJobInner(push) {
             convocatoria: String(r.numeroConvocatoria),
             title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, items,
             categoryMatch: ev.categoryMatch,
+            category: ev.category,
             recommendation: ev.recommendation,
             reasoning: ev.reasoning,
             emailUid: e.uid,
