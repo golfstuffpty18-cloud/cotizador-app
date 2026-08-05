@@ -51,8 +51,11 @@ function detectHeaderRow(sheet) {
     row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
       const norm = normalize(cellText(cell));
       if (!norm) return;
+      // "contains" en vez de igualdad exacta: encabezados reales varían
+      // ("COSTO DE DISTRIBUIDOR", "Precio Unitario (USD)", etc.) y una
+      // coincidencia exacta se queda corta casi siempre.
       for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-        if (aliases.includes(norm)) {
+        if (aliases.some(alias => norm.includes(alias))) {
           colMap[field] = colNumber;
           score++;
           if (field === 'descripcion') hasDescripcion = true;
