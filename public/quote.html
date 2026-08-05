@@ -56,6 +56,34 @@
 
   #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--gray-600); }
   .locked-banner{ background:#e6f7ef; color:#1fa971; border-radius:10px; padding:12px 14px; font-size:.85rem; font-weight:600; margin-bottom:14px; }
+
+  .stat-row{ display:flex; gap:10px; margin-bottom:18px; }
+  .stat-tile{ flex:1; background:var(--gray-50); border-radius:10px; padding:12px 8px; text-align:center; }
+  .stat-label{ font-size:.66rem; color:var(--gray-400); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
+  .stat-value{ font-size:1rem; font-weight:800; color:var(--navy); }
+  .stat-positive{ color:#1fa971; }
+  .stat-negative{ color:#c0392b; }
+  .stat-sub{ font-size:.66rem; color:var(--gray-600); margin-top:2px; }
+
+  .comp-bar-wrap{ margin-bottom:24px; }
+  .comp-bar{ display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; background:#fff; }
+  .comp-seg{ display:flex; align-items:center; justify-content:center; min-width:2px; }
+  .comp-seg span{ font-size:.68rem; font-weight:700; color:#fff; }
+  .comp-gasto{ background:#1616e6; }
+  .comp-ganancia{ background:#1fa971; }
+  .comp-legend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+  .legend-item{ font-size:.75rem; color:var(--gray-600); display:flex; align-items:center; gap:6px; }
+  .legend-dot{ width:9px; height:9px; border-radius:2px; display:inline-block; flex:none; }
+
+  .tier-title{ font-size:.78rem; font-weight:700; color:var(--navy); margin:4px 0 22px; }
+  .tier-chart{ display:flex; align-items:flex-end; gap:6px; height:120px; }
+  .tier-col{ flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; min-width:0; }
+  .tier-bar{ width:22px; max-width:70%; background:var(--gray-100); border-radius:4px 4px 0 0; position:relative; }
+  .tier-bar-actual{ background:#1fa971; }
+  .tier-value{ position:absolute; left:50%; top:-17px; transform:translateX(-50%); font-size:.6rem; font-weight:700; color:var(--gray-600); white-space:nowrap; }
+  .tier-bar-actual .tier-value{ color:#1fa971; }
+  .tier-label{ font-size:.64rem; color:var(--gray-400); margin-top:6px; text-align:center; }
+  .tier-col-actual .tier-label{ color:#1fa971; font-weight:700; }
 </style>
 </head>
 <body>

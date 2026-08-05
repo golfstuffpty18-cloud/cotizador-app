@@ -63,6 +63,8 @@ function render(opp, quote) {
       ${hasDraft ? renderPreview(quote) : `<p style="font-size:.85rem;color:var(--gray-400)">Todavía no has subido un Excel con precios.</p>`}
     </section>
 
+    ${hasDraft ? renderProfitAnalysis(quote) : ''}
+
     ${locked ? `
       <div class="actions">
         <a class="btn btn-primary" style="text-align:center;text-decoration:none;line-height:1.6" href="/api/opportunities/${oppId}/quote/pdf" target="_blank">Descargar PDF</a>
@@ -127,6 +129,105 @@ function renderPreview(quote) {
       <div class="line"><span>ITBM (7%)</span><span>${money(quote.itbm)}</span></div>
       <div class="line total"><span>TOTAL</span><span>${money(quote.total)}</span></div>
     </div>
+  `;
+}
+
+// Niveles estipulados de %G que ya se usan en el dropdown del Excel (1.0 a
+// 1.5), expresados como porcentaje de ganancia sobre el costo (0% a 50%).
+const TIERS_GANANCIA = [0, 10, 20, 30, 40, 50];
+
+// Gasto Total = Costo de Distribuidor + ITBM (7%), por unidad, multiplicado
+// por la cantidad — la misma fórmula de la columna "GASTO TOTAL" del Excel
+// (F = 1.07*E, G = F*D), sumada para todos los ítems.
+function computeProfitAnalysis(quote) {
+  const items = quote.items || [];
+  let gastoTotal = 0;
+  for (const i of items) {
+    const costoDistribuidor = Number(i.costoDistribuidor) || 0;
+    const cantidad = Number(i.cantidad) || 0;
+    gastoTotal += costoDistribuidor * 1.07 * cantidad;
+  }
+  const precioFinal = Number(quote.total) || 0;
+  const ganancia = precioFinal - gastoTotal;
+  const gananciaPct = gastoTotal > 0 ? (ganancia / gastoTotal) * 100 : 0;
+  return { gastoTotal, precioFinal, ganancia, gananciaPct };
+}
+
+function renderProfitAnalysis(quote) {
+  const { gastoTotal, precioFinal, ganancia, gananciaPct } = computeProfitAnalysis(quote);
+  if (gastoTotal <= 0) return ''; // Excel sin "Costo de Distribuidor" cargado — nada que analizar todavía
+
+  if (ganancia < 0) {
+    return `
+      <section>
+        <h2>Análisis de rentabilidad</h2>
+        <p style="font-size:.85rem;color:#c0392b;margin:0">
+          ⚠️ El precio final (${money(precioFinal)}) es menor que el gasto total (${money(gastoTotal)}).
+          Revisa el %G de cada ítem en el Excel antes de aprobar.
+        </p>
+      </section>
+    `;
+  }
+
+  const gastoPctPrecio = precioFinal > 0 ? (gastoTotal / precioFinal) * 100 : 0;
+  const gananciaPctPrecio = 100 - gastoPctPrecio;
+
+  const tiers = TIERS_GANANCIA.map(pct => ({ pct, precioFinal: gastoTotal * (1 + pct / 100) }));
+  const maxTierPrice = Math.max(...tiers.map(t => t.precioFinal), precioFinal, 1);
+
+  return `
+    <section>
+      <h2>Análisis de rentabilidad</h2>
+
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="stat-label">Gasto total</div>
+          <div class="stat-value">${money(gastoTotal)}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Precio final</div>
+          <div class="stat-value">${money(precioFinal)}</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Ganancia</div>
+          <div class="stat-value stat-positive">${money(ganancia)}</div>
+          <div class="stat-sub">${gananciaPct.toFixed(1)}% sobre el costo</div>
+        </div>
+      </div>
+
+      <div class="comp-bar-wrap">
+        <div class="comp-bar">
+          <div class="comp-seg comp-gasto" style="flex:${gastoTotal} 0 0" title="Gasto total: ${money(gastoTotal)}">
+            ${gastoPctPrecio >= 20 ? `<span>${gastoPctPrecio.toFixed(0)}%</span>` : ''}
+          </div>
+          <div class="comp-seg comp-ganancia" style="flex:${ganancia} 0 0" title="Ganancia: ${money(ganancia)}">
+            ${gananciaPctPrecio >= 20 ? `<span>${gananciaPctPrecio.toFixed(0)}%</span>` : ''}
+          </div>
+        </div>
+        <div class="comp-legend">
+          <span class="legend-item"><i class="legend-dot" style="background:#1616e6"></i>Gasto total — ${money(gastoTotal)} (${gastoPctPrecio.toFixed(0)}%)</span>
+          <span class="legend-item"><i class="legend-dot" style="background:#1fa971"></i>Ganancia — ${money(ganancia)} (${gananciaPctPrecio.toFixed(0)}%)</span>
+        </div>
+      </div>
+
+      <h3 class="tier-title">Precio final por % de ganancia estipulado (sobre el mismo gasto total)</h3>
+      <div class="tier-chart">
+        ${tiers.map(t => `
+          <div class="tier-col">
+            <div class="tier-bar" style="height:${Math.max(4, (t.precioFinal / maxTierPrice) * 100)}%" title="${t.pct}% de ganancia → ${money(t.precioFinal)}">
+              <span class="tier-value">${money(t.precioFinal)}</span>
+            </div>
+            <div class="tier-label">${t.pct}%</div>
+          </div>
+        `).join('')}
+        <div class="tier-col tier-col-actual">
+          <div class="tier-bar tier-bar-actual" style="height:${Math.max(4, (precioFinal / maxTierPrice) * 100)}%" title="Tu cotización actual: ${gananciaPct.toFixed(1)}% de ganancia → ${money(precioFinal)}">
+            <span class="tier-value">${money(precioFinal)}</span>
+          </div>
+          <div class="tier-label">Actual<br>(${gananciaPct.toFixed(0)}%)</div>
+        </div>
+      </div>
+    </section>
   `;
 }
 
