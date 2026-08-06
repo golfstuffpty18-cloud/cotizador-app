@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotizaciones directas | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<style>
+  :root{
+    --blue:#1616e6; --navy:#0a0a1a;
+    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--gray-50); color:#10101f;
+  }
+  header{
+    background: var(--navy); color:#fff; padding:16px 20px;
+    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10;
+  }
+  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
+  header h1{ font-size:.95rem; margin:0; font-weight:700; flex:1; }
+
+  main{ padding:14px 14px 40px; max-width:640px; margin:0 auto; }
+  section{ background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 10px 24px -16px rgba(10,10,26,.2); }
+  h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:0 0 14px; }
+
+  label{ display:block; font-size:.78rem; font-weight:600; color:var(--navy); margin-bottom:5px; }
+  input, select{
+    width:100%; padding:10px 12px; border-radius:8px; border:2px solid var(--gray-100);
+    font-size:.88rem; font-family:inherit; margin-bottom:12px;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--blue); }
+
+  .item-row{ display:grid; grid-template-columns:2fr 1fr 32px; gap:8px; align-items:start; margin-bottom:8px; }
+  .item-row input{ margin-bottom:0; }
+  .item-row .rm{
+    height:40px; border-radius:8px; border:2px solid var(--gray-100); background:#fff;
+    color:#c0392b; font-weight:700; cursor:pointer;
+  }
+
+  .btn{ padding:12px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.86rem; cursor:pointer; }
+  .btn-ghost{ background:#fff; border-color:var(--gray-100); color:var(--navy); width:100%; }
+  .btn-primary{ background:var(--blue); color:#fff; width:100%; }
+  .btn-add{ background:var(--gray-50); border:2px dashed var(--gray-100); color:var(--gray-600); width:100%; margin-bottom:14px; }
+
+  .card{
+    background:#fff; border-radius:14px; padding:18px; margin-bottom:14px;
+    box-shadow:0 10px 24px -16px rgba(10,10,26,.25); border-left:6px solid var(--blue);
+  }
+  .badge{
+    display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-bottom:8px;
+    background:#e6ecfe; color:var(--blue);
+  }
+  .card .title{ font-size:.98rem; font-weight:700; color:var(--navy); margin-bottom:6px; }
+  .card .meta{ font-size:.78rem; color:var(--gray-600); margin-bottom:10px; }
+  .quote-link{
+    display:block; text-align:center; margin-top:4px; padding:10px;
+    border-radius:999px; background:var(--blue); color:#fff; font-weight:700; font-size:.82rem; text-decoration:none;
+  }
+  .empty{ text-align:center; color:var(--gray-400); padding:40px 20px; font-size:.9rem; }
+  #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--gray-600); }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">←</a>
+  <h1>Cotizaciones directas</h1>
+  <a href="#" id="btnNueva" title="Nueva cotización directa">＋</a>
+</header>
+
+<main>
+  <section id="formSection" style="display:none">
+    <h2>Nueva cotización directa</h2>
+    <label for="titulo">Cliente / título del proyecto</label>
+    <input type="text" id="titulo" placeholder="Ej. Residencia Sr. Pérez, Cadena XYZ...">
+
+    <label for="categoria">Categoría</label>
+    <select id="categoria"></select>
+
+    <label>Ítems</label>
+    <div id="items"></div>
+    <button type="button" class="btn btn-add" id="btnAddItem">+ Agregar ítem</button>
+
+    <button type="button" class="btn btn-primary" id="btnCrear">Crear cotización</button>
+    <div id="msg"></div>
+  </section>
+
+  <div id="list">Cargando…</div>
+</main>
+
+<script src="/directo.js"></script>
+</body>
+</html>

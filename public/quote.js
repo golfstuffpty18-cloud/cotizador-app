@@ -33,9 +33,9 @@ function render(opp, quote) {
     ${locked ? `<div class="locked-banner">✅ Cotización aprobada — ya no se puede editar. Descarga el PDF abajo.</div>` : ''}
 
     <section>
-      <h2>Proceso</h2>
+      <h2>${opp.source === 'directo' ? 'Cliente' : 'Proceso'}</h2>
       <p style="margin:0;font-size:.85rem;color:var(--gray-600)">
-        <b>${opp.act_number}</b> — ${escapeHtml(opp.title)}
+        ${opp.source === 'directo' ? escapeHtml(opp.title) : `<b>${opp.act_number}</b> — ${escapeHtml(opp.title)}`}
       </p>
       ${esIncendio && opp.tecnologia_incendio ? `<p style="margin:8px 0 0;font-size:.78rem;color:var(--blue);font-weight:700">Tecnología: ${escapeHtml(opp.tecnologia_incendio)}</p>` : ''}
     </section>

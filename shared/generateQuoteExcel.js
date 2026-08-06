@@ -29,6 +29,7 @@ const MARKER = 'COTIZADOR_GS_V2';
 // else is a formula, same relationships as the original spreadsheet.
 
 async function generateQuoteExcel({ opportunity, quote }) {
+  const isDirecto = !!(opportunity && opportunity.source === 'directo');
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Cotizador GS Technologies';
   const sheet = wb.addWorksheet('Cotización');
@@ -64,7 +65,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
   sheet.mergeCells('A7:L7');
   cellText(sheet, 'A7', `RUC: ${COMPANY.ruc}  |  ${COMPANY.correo}`, { size: 9, color: '565873' });
 
-  if (opportunity && opportunity.act_number) {
+  if (opportunity && opportunity.act_number && opportunity.source !== 'directo') {
     sheet.mergeCells('A8:L8');
     cellText(sheet, 'A8', `Proceso PanamaCompra: ${opportunity.act_number}`, { size: 9, italic: true, color: '565873' });
   }
@@ -151,40 +152,44 @@ async function generateQuoteExcel({ opportunity, quote }) {
   totalLine(sheet, r, 'TOTAL COTIZACIÓN', `J${subtotalRow}+J${itbmRow}`, true); const totalRow = r; r++;
 
   // ===== Verificación contra el precio de referencia de PanamaCompra =====
-  r += 2;
-  sectionLabel(sheet, `A${r}`, 'VERIFICACIÓN DE PRECIO DE REFERENCIA'); r++;
-  totalLine(sheet, r, 'Suma "Precio de Referencia" de los ítems', `SUM(M${firstItemRow}:M${lastItemRow})`); const refSumRow = r; r++;
+  // No aplica a cotizaciones directas: no hay pliego ni precio de referencia
+  // con qué comparar, así que la sección completa se omite.
+  if (!isDirecto) {
+    r += 2;
+    sectionLabel(sheet, `A${r}`, 'VERIFICACIÓN DE PRECIO DE REFERENCIA'); r++;
+    totalLine(sheet, r, 'Suma "Precio de Referencia" de los ítems', `SUM(M${firstItemRow}:M${lastItemRow})`); const refSumRow = r; r++;
 
-  const refPrecioSistema = (opportunity && opportunity.reference_price != null) ? Number(opportunity.reference_price) : null;
-  if (refPrecioSistema != null) {
-    totalLine(sheet, r, 'Precio de referencia del sistema (PanamaCompra)', String(refPrecioSistema)); const refSistemaRow = r; r++;
-    totalLine(sheet, r, 'Diferencia', `J${refSumRow}-J${refSistemaRow}`); const refDiffRow = r; r++;
+    const refPrecioSistema = (opportunity && opportunity.reference_price != null) ? Number(opportunity.reference_price) : null;
+    if (refPrecioSistema != null) {
+      totalLine(sheet, r, 'Precio de referencia del sistema (PanamaCompra)', String(refPrecioSistema)); const refSistemaRow = r; r++;
+      totalLine(sheet, r, 'Diferencia', `J${refSumRow}-J${refSistemaRow}`); const refDiffRow = r; r++;
 
-    sheet.mergeCells(r, 1, r, 9);
-    const checkLabel = sheet.getCell(r, 1);
-    checkLabel.value = 'Verificación';
-    checkLabel.font = { bold: true, size: 10, color: { argb: 'FF565873' } };
-    checkLabel.alignment = { horizontal: 'right' };
-    sheet.mergeCells(r, 10, r, 13);
-    const checkCell = sheet.getCell(r, 10);
-    checkCell.value = { formula: `IF(ROUND(J${refDiffRow},2)=0,"✓ Coincide con el precio de referencia","⚠ No coincide con el precio de referencia")` };
-    checkCell.font = { bold: true, size: 10 };
-    const checkRow = r;
-    r++;
+      sheet.mergeCells(r, 1, r, 9);
+      const checkLabel = sheet.getCell(r, 1);
+      checkLabel.value = 'Verificación';
+      checkLabel.font = { bold: true, size: 10, color: { argb: 'FF565873' } };
+      checkLabel.alignment = { horizontal: 'right' };
+      sheet.mergeCells(r, 10, r, 13);
+      const checkCell = sheet.getCell(r, 10);
+      checkCell.value = { formula: `IF(ROUND(J${refDiffRow},2)=0,"✓ Coincide con el precio de referencia","⚠ No coincide con el precio de referencia")` };
+      checkCell.font = { bold: true, size: 10 };
+      const checkRow = r;
+      r++;
 
-    sheet.addConditionalFormatting({
-      ref: `J${checkRow}:M${checkRow}`,
-      rules: [
-        { type: 'containsText', operator: 'containsText', text: '✓', style: { font: { color: { argb: 'FF1FA971' }, bold: true } } },
-        { type: 'containsText', operator: 'containsText', text: '⚠', style: { font: { color: { argb: 'FFC0392B' }, bold: true } } },
-      ],
-    });
-  } else {
-    sheet.mergeCells(r, 1, r, 13);
-    const noRef = sheet.getCell(r, 1);
-    noRef.value = 'PanamaCompra no indicó un precio de referencia total para este proceso — no hay con qué comparar.';
-    noRef.font = { italic: true, size: 9, color: { argb: 'FF8A8CA3' } };
-    r++;
+      sheet.addConditionalFormatting({
+        ref: `J${checkRow}:M${checkRow}`,
+        rules: [
+          { type: 'containsText', operator: 'containsText', text: '✓', style: { font: { color: { argb: 'FF1FA971' }, bold: true } } },
+          { type: 'containsText', operator: 'containsText', text: '⚠', style: { font: { color: { argb: 'FFC0392B' }, bold: true } } },
+        ],
+      });
+    } else {
+      sheet.mergeCells(r, 1, r, 13);
+      const noRef = sheet.getCell(r, 1);
+      noRef.value = 'PanamaCompra no indicó un precio de referencia total para este proceso — no hay con qué comparar.';
+      noRef.font = { italic: true, size: 9, color: { argb: 'FF8A8CA3' } };
+      r++;
+    }
   }
 
   // ===== Análisis de rentabilidad (gasto vs. ganancia, con barras nativas de Excel) =====

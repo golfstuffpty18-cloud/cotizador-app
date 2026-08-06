@@ -99,13 +99,17 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_province TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS tecnologia_incendio TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'panamacompra';
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS subcategoria TEXT;
 `;
 
+// Las cotizaciones directas (source='directo') no tienen fecha límite de
+// PanamaCompra — no deben autoborrarse a los 5 días como las demás.
 const CLEANUP = `
 DELETE FROM opportunities
-WHERE (deadline IS NOT NULL AND deadline < now())
-   OR (deadline IS NULL AND created_at < now() - interval '5 days');
+WHERE source != 'directo'
+  AND ((deadline IS NOT NULL AND deadline < now())
+   OR (deadline IS NULL AND created_at < now() - interval '5 days'));
 `;
 
 async function init() {

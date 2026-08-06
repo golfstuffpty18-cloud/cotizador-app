@@ -43,7 +43,7 @@ function generateQuotePdf({ quote, opportunity }) {
       .text('COTIZACIÓN', 0, 43, { align: 'right', width: pageW - marginX });
     doc.font('Helvetica').fontSize(9).fillColor(GRAY)
       .text(`Fecha: ${new Date().toLocaleDateString('es-PA')}`, 0, 71, { align: 'right', width: pageW - marginX });
-    if (opportunity && opportunity.act_number) {
+    if (opportunity && opportunity.act_number && opportunity.source !== 'directo') {
       doc.text(`Proceso PanamaCompra: ${opportunity.act_number}`, 0, 85, { align: 'right', width: pageW - marginX });
     }
 

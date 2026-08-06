@@ -64,13 +64,44 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 });
 
 app.get('/api/opportunities', async (req, res) => {
+  const source = req.query.source || 'panamacompra';
   const { rows } = await pool.query(
     `SELECT * FROM opportunities
      WHERE (deadline IS NULL OR deadline > now())
        AND decision != 'no_participar'
-     ORDER BY created_at DESC LIMIT 100`
+       AND source = $1
+     ORDER BY created_at DESC LIMIT 100`,
+    [source]
   );
   res.json(rows);
+});
+
+// Cotización para un cliente fuera de PanamaCompra: no hay pliego del que
+// sacar los ítems, así que el usuario los escribe él mismo (descripción +
+// cantidad). A partir de ahí reutiliza exactamente el mismo flujo de
+// quote.html (Excel con sugerencias del catálogo, análisis de rentabilidad,
+// PDF) que las oportunidades de PanamaCompra.
+app.post('/api/opportunities/directo', async (req, res) => {
+  const { titulo, categoria, items } = req.body || {};
+  if (!titulo || !categoria) return res.status(400).json({ error: 'faltan título o categoría' });
+  const safeItems = Array.isArray(items) ? items.filter(i => i && i.descripcion) : [];
+  if (!safeItems.length) return res.status(400).json({ error: 'agrega al menos un ítem con descripción' });
+
+  const normalizedItems = safeItems.map((i, idx) => ({
+    numRenglon: idx + 1,
+    descripcion: i.descripcion,
+    modelo: i.modelo || '',
+    cantidad: Number(i.cantidad) || 1,
+  }));
+
+  const { rows } = await pool.query(
+    `INSERT INTO opportunities
+      (act_number, convocatoria, title, entity, items, category, category_match, recommendation, reasoning, decision, source)
+     VALUES ($1,'1',$2,$2,$3,$4,true,'participar','Cotización directa con cliente (fuera de PanamaCompra).','participar','directo')
+     RETURNING *`,
+    [`DIRECTO-${Date.now()}`, titulo, JSON.stringify(normalizedItems), categoria]
+  );
+  res.json(rows[0]);
 });
 
 app.post('/api/opportunities/:id/decision', async (req, res) => {
