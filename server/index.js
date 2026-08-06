@@ -10,6 +10,7 @@ const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = requi
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
+const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -214,6 +215,7 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
+  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer); // respaldo best-effort, no bloquea la descarga
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
   res.send(buffer);
@@ -246,6 +248,7 @@ app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
   const opportunity = oppRows[0];
 
   const pdfBuffer = await generateQuotePdf({ quote, opportunity });
+  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.pdf`, pdfBuffer); // respaldo best-effort, no bloquea la aprobación
 
   await pool.query(
     `UPDATE quotes SET estado = 'aprobada', pdf = $1, approved_at = now(), updated_at = now() WHERE opportunity_id = $2`,
