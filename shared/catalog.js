@@ -18,13 +18,17 @@ function normalize(text) {
 // entre sí (un dispositivo direccionable no funciona en un panel
 // convencional y viceversa) — mezclarlas al sugerir precios es el bug que
 // causó que se sugiriera un panel convencional con una estación direccionable
-// en una misma cotización. Si no se menciona ninguna, se asume "Universal"
-// (baterías, cable, herramientas: sirven para cualquier tecnología).
+// en una misma cotización. Muchas fichas técnicas no dicen "convencional" o
+// "direccionable" directamente, pero sí delatan la tecnología: un panel
+// convencional siempre habla de "zonas", uno direccionable/inteligente
+// siempre habla de "lazo" (loop). Si no se menciona ninguna señal, se asume
+// "Universal" (baterías, cable, herramientas: sirven para cualquier
+// tecnología).
 function classifyTecnologia(text) {
   const t = normalize(text);
   if (!t) return null;
-  if (/\bdireccion/.test(t)) return 'Direccionable';
-  if (/\bconvencional/.test(t)) return 'Convencional';
+  if (/\bdireccion|\blazo|\bloop|\bintelig/.test(t)) return 'Direccionable';
+  if (/\bconvencional|\bzona/.test(t)) return 'Convencional';
   return 'Universal';
 }
 
