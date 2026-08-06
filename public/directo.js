@@ -15,17 +15,68 @@ const btnCrear = document.getElementById('btnCrear');
 const msg = document.getElementById('msg');
 const listEl = document.getElementById('list');
 
+// Sugiere ítems del catálogo mientras se escribe la descripción, para que el
+// usuario elija algo que YA tiene precio cargado en vez de escribir texto
+// libre que después no encuentra coincidencia al generar el Excel.
+async function fetchSuggestions(q, suggList, descInput) {
+  const categoria = categoriaSelect.value;
+  let items = await fetch(`/api/catalog?categoria=${encodeURIComponent(categoria)}&search=${encodeURIComponent(q)}`).then(r => r.json());
+  let otraCategoria = false;
+  if (!items.length) {
+    // Nada en esta categoría — buscar en todo el catálogo (ej. un "switch POE"
+    // puede estar cargado bajo Control de Acceso y servir igual para CCTV).
+    items = await fetch(`/api/catalog?search=${encodeURIComponent(q)}`).then(r => r.json());
+    otraCategoria = true;
+  }
+  if (!items.length) { suggList.innerHTML = ''; suggList.style.display = 'none'; return; }
+  suggList.innerHTML = items.slice(0, 6).map(it => `
+    <div class="sugg-item" data-desc="${escapeHtml(it.descripcion)}">
+      <span class="sugg-desc">${escapeHtml(it.descripcion)}${otraCategoria ? ` <i style="color:var(--gray-400);font-style:normal">(${escapeHtml(it.categoria || 'otra categoría')})</i>` : ''}</span>
+      <span class="sugg-price">${it.costo_distribuidor != null ? 'B/. ' + Number(it.costo_distribuidor).toFixed(2) : 'sin costo'}</span>
+    </div>
+  `).join('');
+  suggList.style.display = 'block';
+  suggList.querySelectorAll('.sugg-item').forEach(el => {
+    // mousedown (no click) para que dispare ANTES del blur del input
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      descInput.value = el.dataset.desc;
+      suggList.style.display = 'none';
+    });
+  });
+}
+
 function addItemRow() {
   const row = document.createElement('div');
   row.className = 'item-row';
   row.innerHTML = `
-    <input type="text" class="item-desc" placeholder="Descripción del ítem">
+    <div class="desc-wrap">
+      <input type="text" class="item-desc" placeholder="Descripción del ítem" autocomplete="off">
+      <div class="sugg-list"></div>
+    </div>
     <input type="number" class="item-cant" placeholder="Cant." min="1" value="1">
     <button type="button" class="rm">×</button>
   `;
   row.querySelector('.rm').addEventListener('click', () => {
     if (itemsWrap.children.length > 1) row.remove();
   });
+
+  const descInput = row.querySelector('.item-desc');
+  const suggList = row.querySelector('.sugg-list');
+  let debounceTimer;
+  descInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = descInput.value.trim();
+    if (q.length < 2) { suggList.innerHTML = ''; suggList.style.display = 'none'; return; }
+    debounceTimer = setTimeout(() => fetchSuggestions(q, suggList, descInput), 250);
+  });
+  descInput.addEventListener('focus', () => {
+    if (suggList.innerHTML) suggList.style.display = 'block';
+  });
+  descInput.addEventListener('blur', () => {
+    setTimeout(() => { suggList.style.display = 'none'; }, 150);
+  });
+
   itemsWrap.appendChild(row);
 }
 
