@@ -104,6 +104,19 @@ app.post('/api/opportunities/directo', async (req, res) => {
   res.json(rows[0]);
 });
 
+// Solo cotizaciones directas: las de PanamaCompra se ocultan con
+// decision='no_participar' (se conserva el historial), pero una cotización
+// directa sin terminar es solo desorden en pantalla — se puede borrar.
+app.delete('/api/opportunities/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT source FROM opportunities WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  if (rows[0].source !== 'directo') {
+    return res.status(400).json({ error: 'solo se pueden borrar cotizaciones directas' });
+  }
+  await pool.query('DELETE FROM opportunities WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+});
+
 app.post('/api/opportunities/:id/decision', async (req, res) => {
   const { decision } = req.body || {};
   if (!['participar', 'no_participar', 'pending'].includes(decision)) {

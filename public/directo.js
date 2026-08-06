@@ -113,15 +113,27 @@ btnCrear.addEventListener('click', async () => {
   location.href = `/quote.html?id=${data.id}`;
 });
 
+async function deleteOpportunity(id, div) {
+  if (!confirm('¿Borrar esta cotización directa? Esta acción no se puede deshacer.')) return;
+  const res = await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
+  if (!res.ok) { alert('No se pudo borrar.'); return; }
+  div.remove();
+  if (!listEl.children.length) loadList();
+}
+
 function card(op) {
   const div = document.createElement('div');
   div.className = 'card';
   div.innerHTML = `
-    <span class="badge">${escapeHtml(op.category || 'Sin categoría')}</span>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <span class="badge">${escapeHtml(op.category || 'Sin categoría')}</span>
+      <button type="button" class="rm" title="Borrar" style="width:32px;height:32px;flex:none">🗑</button>
+    </div>
     <div class="title">${escapeHtml(op.title)}</div>
     <div class="meta">Creada el ${fmtDate(op.created_at)}</div>
     <a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>
   `;
+  div.querySelector('.rm').addEventListener('click', () => deleteOpportunity(op.id, div));
   return div;
 }
 
