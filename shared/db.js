@@ -1,11 +1,19 @@
 const { Pool } = require('pg');
 const { parseDeadline } = require('./parseWindow');
 
+// Sin estos timeouts, una consulta o conexión atascada (ej. un corte breve
+// hacia Render Postgres) deja la petición HTTP colgada para siempre — el
+// mismo tipo de bug que causaba que el chequeo de correo se quedara
+// pegado (ver shared/checkEmailJob.js). Aquí el síntoma sería "subir el
+// Excel/aprobar la cotización se demora y nunca llega el PDF".
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
     ? false
     : { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 20000,
+  query_timeout: 25000,
 });
 
 // Sin este manejador, un corte de red en una conexión inactiva del pool

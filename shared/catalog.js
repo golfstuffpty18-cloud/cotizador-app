@@ -95,11 +95,16 @@ async function suggestPricesForItems(items, categoria, tecnologiaHint) {
 }
 
 // Guarda/actualiza el catálogo con los ítems de una cotización ya aprobada.
+// Trae el catálogo UNA sola vez (antes hacía un SELECT del catálogo entero
+// por cada ítem de la cotización — con cotizaciones de varios ítems eso eran
+// varias vueltas redundantes a la base de datos, justo el tipo de demora que
+// hace que "aprobar y generar el PDF" se sienta colgado).
 async function upsertFromQuoteItems(items, { proveedor } = {}) {
+  const { rows } = await pool.query('SELECT id, descripcion FROM catalog_items');
+
   for (const item of items) {
     if (!item.descripcion || !item.costoDistribuidor) continue;
 
-    const { rows } = await pool.query('SELECT id, descripcion FROM catalog_items');
     const target = normalize(item.descripcion);
     let matchId = null;
     if (rows.length) {
@@ -119,11 +124,12 @@ async function upsertFromQuoteItems(items, { proveedor } = {}) {
         [item.descripcion, item.modelo || '', item.costoDistribuidor, item.margenG || null, proveedor || '', matchId]
       );
     } else {
-      await pool.query(
+      const { rows: inserted } = await pool.query(
         `INSERT INTO catalog_items (descripcion, modelo, costo_distribuidor, margen_g, proveedor, fecha_cotizacion)
-         VALUES ($1,$2,$3,$4,$5, now())`,
+         VALUES ($1,$2,$3,$4,$5, now()) RETURNING id, descripcion`,
         [item.descripcion, item.modelo || '', item.costoDistribuidor, item.margenG || null, proveedor || '']
       );
+      rows.push(inserted[0]); // para que otros ítems de esta misma cotización puedan matchear contra este
     }
   }
 }
@@ -138,6 +144,11 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
   let actualizados = 0;
   let omitidos = 0;
 
+  // Traer el catálogo UNA sola vez (antes era un SELECT del catálogo entero
+  // por cada fila del Excel importado — con archivos grandes eso eran
+  // decenas de vueltas redundantes a la base de datos).
+  const { rows: existentes } = await pool.query('SELECT id, descripcion FROM catalog_items');
+
   for (const row of rows) {
     const descripcion = (row.descripcion || '').trim();
     if (!descripcion) { omitidos++; continue; }
@@ -150,7 +161,6 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
     const proveedor = row.proveedor || '';
     const notas = row.notas || '';
 
-    const { rows: existentes } = await pool.query('SELECT id, descripcion FROM catalog_items');
     let matchId = null;
     if (existentes.length) {
       const target = normalize(descripcion);
@@ -176,11 +186,12 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
       );
       actualizados++;
     } else {
-      await pool.query(
+      const { rows: inserted } = await pool.query(
         `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, proveedor, notas, fecha_cotizacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now()) RETURNING id, descripcion`,
         [descripcion, categoria, subcategoria, marca, modelo, costo, proveedor, notas]
       );
+      existentes.push(inserted[0]); // para que otras filas del mismo archivo puedan matchear contra esta
       creados++;
     }
   }
