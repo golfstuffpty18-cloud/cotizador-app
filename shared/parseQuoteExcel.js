@@ -70,14 +70,27 @@ async function parseQuoteExcel(buffer) {
     const row = sheet.getRow(r);
     const descripcion = cellValueText(row.getCell(2));
     if (!descripcion) break; // end of table
+
+    const costoDistribuidor = cellValueNumber(row.getCell(5));
+    const margenG = cellValueNumber(row.getCell(8));
+    // "Precio Un." (columna I) es una fórmula (PRODUCT(F,H), es decir
+    // costoDistribuidor*1.07*margenG) — no se lee su resultado cacheado
+    // porque si el programa con el que se editó el Excel no recalculó las
+    // fórmulas antes de guardar (cálculo manual, o algún visor/editor que no
+    // ejecuta fórmulas), esa celda se queda en 0 aunque el usuario sí haya
+    // llenado el costo y el %G, y la cotización sale sin precios. Se
+    // recalcula siempre desde los dos únicos valores que el usuario
+    // realmente escribe, replicando la misma fórmula de generateQuoteExcel.js.
+    const precioUnitario = costoDistribuidor * 1.07 * margenG;
+
     result.items.push({
       numRenglon: cellValueNumber(row.getCell(1)) || (result.items.length + 1),
       descripcion,
       modelo: cellValueText(row.getCell(3)),
       cantidad: cellValueNumber(row.getCell(4)),
-      costoDistribuidor: cellValueNumber(row.getCell(5)),
-      margenG: cellValueNumber(row.getCell(8)),
-      precioUnitario: cellValueNumber(row.getCell(9)),
+      costoDistribuidor,
+      margenG,
+      precioUnitario,
       precioReferencia: cellValueNumber(row.getCell(13)),
     });
   }
