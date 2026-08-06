@@ -17,22 +17,17 @@ const listEl = document.getElementById('list');
 
 // Sugiere ítems del catálogo mientras se escribe la descripción, para que el
 // usuario elija algo que YA tiene precio cargado en vez de escribir texto
-// libre que después no encuentra coincidencia al generar el Excel.
+// libre que después no encuentra coincidencia al generar el Excel. Solo
+// dentro de la categoría que se está cotizando (nunca de otra categoría), y
+// sin mostrar el costo de distribuidor — es un dato interno, no el precio
+// final, y esta pantalla puede estar a la vista del cliente.
 async function fetchSuggestions(q, suggList, descInput) {
   const categoria = categoriaSelect.value;
-  let items = await fetch(`/api/catalog?categoria=${encodeURIComponent(categoria)}&search=${encodeURIComponent(q)}`).then(r => r.json());
-  let otraCategoria = false;
-  if (!items.length) {
-    // Nada en esta categoría — buscar en todo el catálogo (ej. un "switch POE"
-    // puede estar cargado bajo Control de Acceso y servir igual para CCTV).
-    items = await fetch(`/api/catalog?search=${encodeURIComponent(q)}`).then(r => r.json());
-    otraCategoria = true;
-  }
+  const items = await fetch(`/api/catalog?categoria=${encodeURIComponent(categoria)}&search=${encodeURIComponent(q)}`).then(r => r.json());
   if (!items.length) { suggList.innerHTML = ''; suggList.style.display = 'none'; return; }
   suggList.innerHTML = items.slice(0, 6).map(it => `
     <div class="sugg-item" data-desc="${escapeHtml(it.descripcion)}">
-      <span class="sugg-desc">${escapeHtml(it.descripcion)}${otraCategoria ? ` <i style="color:var(--gray-400);font-style:normal">(${escapeHtml(it.categoria || 'otra categoría')})</i>` : ''}</span>
-      <span class="sugg-price">${it.costo_distribuidor != null ? 'B/. ' + Number(it.costo_distribuidor).toFixed(2) : 'sin costo'}</span>
+      <span class="sugg-desc">${escapeHtml(it.descripcion)}</span>
     </div>
   `).join('');
   suggList.style.display = 'block';
