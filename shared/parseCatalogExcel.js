@@ -8,6 +8,7 @@ const { normalize } = require('./catalog');
 const FIELD_ALIASES = {
   descripcion: ['descripcion', 'articulo', 'producto', 'item', 'nombre', 'detalle'],
   categoria: ['categoria', 'rubro', 'tipo', 'familia'],
+  subcategoria: ['subcategoria', 'tecnologia', 'sub categoria', 'sub rubro'],
   marca: ['marca', 'brand', 'fabricante'],
   modelo: ['modelo', 'model', 'referencia', 'sku'],
   costoDistribuidor: [
@@ -92,6 +93,7 @@ async function parseCatalogExcel(buffer) {
     rows.push({
       descripcion,
       categoria: header.colMap.categoria ? cellText(row.getCell(header.colMap.categoria)) : '',
+      subcategoria: header.colMap.subcategoria ? cellText(row.getCell(header.colMap.subcategoria)) : '',
       marca: header.colMap.marca ? cellText(row.getCell(header.colMap.marca)) : '',
       modelo: header.colMap.modelo ? cellText(row.getCell(header.colMap.modelo)) : '',
       costoDistribuidor: header.colMap.costoDistribuidor ? cellNumber(row.getCell(header.colMap.costoDistribuidor)) : null,

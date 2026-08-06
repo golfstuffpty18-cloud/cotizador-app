@@ -287,24 +287,24 @@ app.get('/api/catalog', async (req, res) => {
 });
 
 app.post('/api/catalog', async (req, res) => {
-  const { descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
+  const { descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
   if (!descripcion) return res.status(400).json({ error: 'falta descripción' });
   const { rows } = await pool.query(
-    `INSERT INTO catalog_items (descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas, fecha_cotizacion)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now()) RETURNING *`,
-    [descripcion, categoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null]
+    `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas, fecha_cotizacion)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now()) RETURNING *`,
+    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null]
   );
   res.json(rows[0]);
 });
 
 app.put('/api/catalog/:id', async (req, res) => {
-  const { descripcion, categoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
+  const { descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
   const { rows } = await pool.query(
     `UPDATE catalog_items SET
-       descripcion = COALESCE($1, descripcion), categoria = $2, marca = $3, modelo = $4,
-       costo_distribuidor = $5, margen_g = $6, proveedor = $7, notas = $8, updated_at = now()
-     WHERE id = $9 RETURNING *`,
-    [descripcion, categoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, req.params.id]
+       descripcion = COALESCE($1, descripcion), categoria = $2, subcategoria = $3, marca = $4, modelo = $5,
+       costo_distribuidor = $6, margen_g = $7, proveedor = $8, notas = $9, updated_at = now()
+     WHERE id = $10 RETURNING *`,
+    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, req.params.id]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);

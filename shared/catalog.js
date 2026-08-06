@@ -13,36 +13,58 @@ function normalize(text) {
     .trim();
 }
 
+// Detecta la tecnología de un equipo de incendio a partir de su propio
+// texto. "Direccionable" y "Convencional" son arquitecturas incompatibles
+// entre sí (un dispositivo direccionable no funciona en un panel
+// convencional y viceversa) — mezclarlas al sugerir precios es el bug que
+// causó que se sugiriera un panel convencional con una estación direccionable
+// en una misma cotización. Si no se menciona ninguna, se asume "Universal"
+// (baterías, cable, herramientas: sirven para cualquier tecnología).
+function classifyTecnologia(text) {
+  const t = normalize(text);
+  if (!t) return null;
+  if (/\bdireccion/.test(t)) return 'Direccionable';
+  if (/\bconvencional/.test(t)) return 'Convencional';
+  return 'Universal';
+}
+
 // Busca la mejor coincidencia por descripción. Si se da una categoría,
 // busca primero SOLO dentro de esa categoría (más preciso: "control de
-// acceso" no compite contra cámaras o materiales de tubería); si no hay
-// nada suficientemente parecido ahí, cae a buscar en todo el catálogo en
-// vez de no sugerir nada.
+// acceso" no compite contra cámaras o materiales de tubería). Dentro de la
+// categoría, si el texto buscado deja ver una tecnología específica
+// (direccionable/convencional), prioriza candidatos de esa misma tecnología
+// o "Universal" antes que los de la tecnología contraria. Si nada alcanza el
+// umbral en ningún paso, cae a buscar en todo el catálogo.
 async function findBestMatch(descripcion, categoria) {
   const target = normalize(descripcion);
   if (!target) return null;
+  const tecnologia = classifyTecnologia(descripcion);
+
+  const tryMatch = (rows) => {
+    if (!rows.length) return null;
+    const candidates = rows.map(r => normalize(r.descripcion));
+    const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(target, candidates);
+    if (bestMatch.rating >= MATCH_THRESHOLD_SUGGEST) {
+      return { item: rows[bestMatchIndex], score: bestMatch.rating };
+    }
+    return null;
+  };
 
   if (categoria) {
     const { rows } = await pool.query('SELECT * FROM catalog_items WHERE categoria = $1', [categoria]);
-    if (rows.length) {
-      const candidates = rows.map(r => normalize(r.descripcion));
-      const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(target, candidates);
-      if (bestMatch.rating >= MATCH_THRESHOLD_SUGGEST) {
-        return { item: rows[bestMatchIndex], score: bestMatch.rating };
-      }
+
+    if (tecnologia && tecnologia !== 'Universal') {
+      const compatibles = rows.filter(r => !r.subcategoria || r.subcategoria === tecnologia || r.subcategoria === 'Universal');
+      const hit = tryMatch(compatibles);
+      if (hit) return hit;
     }
+
+    const hit = tryMatch(rows);
+    if (hit) return hit;
   }
 
   const { rows } = await pool.query('SELECT * FROM catalog_items');
-  if (!rows.length) return null;
-
-  const candidates = rows.map(r => normalize(r.descripcion));
-  const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(target, candidates);
-
-  if (bestMatch.rating >= MATCH_THRESHOLD_SUGGEST) {
-    return { item: rows[bestMatchIndex], score: bestMatch.rating };
-  }
-  return null;
+  return tryMatch(rows);
 }
 
 // Precarga costo/modelo/%G en una lista de ítems del pliego, usando el
@@ -112,6 +134,7 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
     if (!descripcion) { omitidos++; continue; }
 
     const categoria = row.categoria || defaultCategoria || null;
+    const subcategoria = row.subcategoria || classifyTecnologia(descripcion);
     const marca = row.marca || '';
     const modelo = row.modelo || '';
     const costo = row.costoDistribuidor != null ? row.costoDistribuidor : null;
@@ -132,21 +155,22 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
         `UPDATE catalog_items SET
            descripcion = $1,
            categoria = COALESCE(NULLIF($2,''), categoria),
-           marca = COALESCE(NULLIF($3,''), marca),
-           modelo = COALESCE(NULLIF($4,''), modelo),
-           costo_distribuidor = COALESCE($5, costo_distribuidor),
-           proveedor = COALESCE(NULLIF($6,''), proveedor),
-           notas = COALESCE(NULLIF($7,''), notas),
+           subcategoria = COALESCE($3, subcategoria),
+           marca = COALESCE(NULLIF($4,''), marca),
+           modelo = COALESCE(NULLIF($5,''), modelo),
+           costo_distribuidor = COALESCE($6, costo_distribuidor),
+           proveedor = COALESCE(NULLIF($7,''), proveedor),
+           notas = COALESCE(NULLIF($8,''), notas),
            fecha_cotizacion = now(), updated_at = now()
-         WHERE id = $8`,
-        [descripcion, categoria || '', marca, modelo, costo, proveedor, notas, matchId]
+         WHERE id = $9`,
+        [descripcion, categoria || '', subcategoria, marca, modelo, costo, proveedor, notas, matchId]
       );
       actualizados++;
     } else {
       await pool.query(
-        `INSERT INTO catalog_items (descripcion, categoria, marca, modelo, costo_distribuidor, proveedor, notas, fecha_cotizacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, now())`,
-        [descripcion, categoria, marca, modelo, costo, proveedor, notas]
+        `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, proveedor, notas, fecha_cotizacion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())`,
+        [descripcion, categoria, subcategoria, marca, modelo, costo, proveedor, notas]
       );
       creados++;
     }
@@ -155,4 +179,4 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
   return { total: rows.length, creados, actualizados, omitidos };
 }
 
-module.exports = { findBestMatch, suggestPricesForItems, upsertFromQuoteItems, importCatalogRows, normalize };
+module.exports = { findBestMatch, suggestPricesForItems, upsertFromQuoteItems, importCatalogRows, normalize, classifyTecnologia };
