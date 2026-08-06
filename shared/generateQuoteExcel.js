@@ -81,7 +81,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
   r += 1;
 
   // ===== Items table =====
-  const headers = ['Renglón', 'Descripción', 'Modelo del Equipo', 'Unidades', 'COSTO DE DISTRIBUIDOR', 'COSTO DISTRIBUIDOR +ITBM', 'GASTO TOTAL', '%G', 'Precio Un.', 'Subtotal', 'ITBM', 'Suma', 'Precio de Referencia (PanamaCompra)'];
+  const headers = ['Renglón', 'Descripción', 'Modelo del Equipo', 'Unidades', 'COSTO DE DISTRIBUIDOR', 'COSTO DISTRIBUIDOR +ITBM', 'GASTO TOTAL', '%G', 'Precio Un.', 'Subtotal', 'ITBM', 'Suma', isDirecto ? 'Precio de Referencia' : 'Precio de Referencia (PanamaCompra)'];
   headers.forEach((h, i) => {
     const cell = sheet.getCell(r, i + 1);
     cell.value = h;
