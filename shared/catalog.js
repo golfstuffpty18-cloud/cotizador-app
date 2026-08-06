@@ -31,14 +31,16 @@ function classifyTecnologia(text) {
 // Busca la mejor coincidencia por descripción. Si se da una categoría,
 // busca primero SOLO dentro de esa categoría (más preciso: "control de
 // acceso" no compite contra cámaras o materiales de tubería). Dentro de la
-// categoría, si el texto buscado deja ver una tecnología específica
-// (direccionable/convencional), prioriza candidatos de esa misma tecnología
-// o "Universal" antes que los de la tecnología contraria. Si nada alcanza el
-// umbral en ningún paso, cae a buscar en todo el catálogo.
-async function findBestMatch(descripcion, categoria) {
+// categoría, prioriza candidatos de la tecnología indicada (o "Universal")
+// antes que los de la tecnología contraria — `tecnologiaHint` (ej. la
+// respuesta del usuario a "¿convencional o direccionable?") manda sobre lo
+// que se pueda adivinar por texto, porque el texto del pliego casi nunca lo
+// aclara. Si nada alcanza el umbral en ningún paso, cae a buscar en todo el
+// catálogo.
+async function findBestMatch(descripcion, categoria, tecnologiaHint) {
   const target = normalize(descripcion);
   if (!target) return null;
-  const tecnologia = classifyTecnologia(descripcion);
+  const tecnologia = tecnologiaHint || classifyTecnologia(descripcion);
 
   const tryMatch = (rows) => {
     if (!rows.length) return null;
@@ -68,12 +70,15 @@ async function findBestMatch(descripcion, categoria) {
 }
 
 // Precarga costo/modelo/%G en una lista de ítems del pliego, usando el
-// catálogo. `categoria` es la del proceso completo (de evaluate()) — prioriza
-// coincidencias dentro de esa categoría antes de buscar en todo el catálogo.
-async function suggestPricesForItems(items, categoria) {
+// catálogo. `categoria` es la del proceso completo (de evaluate()) —
+// prioriza coincidencias dentro de esa categoría antes de buscar en todo el
+// catálogo. `tecnologiaHint` (Convencional/Direccionable) aplica a TODOS los
+// ítems de la cotización por igual, no por ítem — es una sola respuesta del
+// usuario para toda la cotización de incendio.
+async function suggestPricesForItems(items, categoria, tecnologiaHint) {
   const out = [];
   for (const item of items) {
-    const match = await findBestMatch(item.descripcion, categoria);
+    const match = await findBestMatch(item.descripcion, categoria, tecnologiaHint);
     out.push({
       ...item,
       modelo: item.modelo || (match ? match.item.modelo : '') || '',

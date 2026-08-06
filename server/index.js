@@ -92,6 +92,23 @@ app.get('/api/opportunities/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
+// Solo aplica a Detección de Incendio: convencional y direccionable son
+// arquitecturas incompatibles entre sí, y el texto del pliego casi nunca
+// aclara cuál es. Se pregunta una sola vez por oportunidad y esa respuesta
+// dirige la búsqueda de precios de TODA la cotización (no por ítem).
+app.post('/api/opportunities/:id/tecnologia', async (req, res) => {
+  const { tecnologia } = req.body || {};
+  if (!['Convencional', 'Direccionable'].includes(tecnologia)) {
+    return res.status(400).json({ error: 'tecnologia debe ser Convencional o Direccionable' });
+  }
+  const { rows } = await pool.query(
+    `UPDATE opportunities SET tecnologia_incendio = $1 WHERE id = $2 RETURNING *`,
+    [tecnologia, req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
 app.get('/api/opportunities/:id/quote', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [req.params.id]);
   if (!rows.length) return res.json(null);
@@ -149,7 +166,7 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
 
   const opportunity = oppRows[0];
   const baseItems = (quote && quote.items && quote.items.length) ? quote.items : (opportunity.items || []);
-  const suggestedItems = await suggestPricesForItems(baseItems, opportunity.category);
+  const suggestedItems = await suggestPricesForItems(baseItems, opportunity.category, opportunity.tecnologia_incendio);
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });

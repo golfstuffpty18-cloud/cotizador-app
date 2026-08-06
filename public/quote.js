@@ -26,6 +26,8 @@ async function load() {
 function render(opp, quote) {
   const locked = quote && quote.estado === 'aprobada';
   const hasDraft = !!(quote && quote.items && quote.items.length);
+  const esIncendio = opp.category === 'Detección de Incendio';
+  const needsTecnologia = esIncendio && !opp.tecnologia_incendio && !locked;
 
   app.innerHTML = `
     ${locked ? `<div class="locked-banner">✅ Cotización aprobada — ya no se puede editar. Descarga el PDF abajo.</div>` : ''}
@@ -35,9 +37,24 @@ function render(opp, quote) {
       <p style="margin:0;font-size:.85rem;color:var(--gray-600)">
         <b>${opp.act_number}</b> — ${escapeHtml(opp.title)}
       </p>
+      ${esIncendio && opp.tecnologia_incendio ? `<p style="margin:8px 0 0;font-size:.78rem;color:var(--blue);font-weight:700">Tecnología: ${escapeHtml(opp.tecnologia_incendio)}</p>` : ''}
     </section>
 
-    ${!locked ? `
+    ${needsTecnologia ? `
+    <section>
+      <h2>¿Convencional o direccionable?</h2>
+      <p style="font-size:.82rem;color:var(--gray-600);margin-top:0">
+        Antes de armar el Excel, dinos qué tecnología es este sistema de incendio — convencional y direccionable
+        usan equipo distinto e incompatible entre sí, y así la app te sugiere el precio correcto de una vez.
+      </p>
+      <div class="actions">
+        <button class="btn btn-ghost" id="btnConvencional" style="width:100%">Convencional</button>
+        <button class="btn btn-ghost" id="btnDireccionable" style="width:100%">Direccionable</button>
+      </div>
+    </section>
+    ` : ''}
+
+    ${!locked && !needsTecnologia ? `
     <section>
       <h2>Paso 1 · Descarga el Excel</h2>
       <p style="font-size:.82rem;color:var(--gray-600);margin-top:0">
@@ -76,6 +93,19 @@ function render(opp, quote) {
     ` : '')}
     <div id="msg"></div>
   `;
+
+  const btnConvencional = document.getElementById('btnConvencional');
+  const btnDireccionable = document.getElementById('btnDireccionable');
+  const setTecnologia = async (tecnologia) => {
+    await fetch(`/api/opportunities/${oppId}/tecnologia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tecnologia }),
+    });
+    load();
+  };
+  if (btnConvencional) btnConvencional.addEventListener('click', () => setTecnologia('Convencional'));
+  if (btnDireccionable) btnDireccionable.addEventListener('click', () => setTecnologia('Direccionable'));
 
   const fileInput = document.getElementById('fileInput');
   const btnUpload = document.getElementById('btnUpload');
