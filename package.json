@@ -12,6 +12,7 @@
     "cookie-parser": "^1.4.6",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
+    "express-async-errors": "^3.1.1",
     "imapflow": "^1.0.164",
     "mailparser": "^3.7.1",
     "multer": "^2.2.0",

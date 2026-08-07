@@ -1,4 +1,10 @@
 const express = require('express');
+// Sin esto, un error inesperado dentro de una ruta async (ej. un fallo de
+// Postgres al guardar un borrador) no llega a ningún manejador en Express 4
+// — la petición se queda colgada para siempre en el navegador, sin
+// respuesta ni error visible. express-async-errors parchea las rutas para
+// que cualquier rechazo de promesa caiga en el manejador de errores de abajo.
+require('express-async-errors');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const multer = require('multer');
@@ -393,6 +399,15 @@ app.put('/api/catalog/:id', async (req, res) => {
 app.delete('/api/catalog/:id', async (req, res) => {
   await pool.query('DELETE FROM catalog_items WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
+});
+
+// Manejador de errores global: sin esto, un error atrapado por
+// express-async-errors se queda sin respuesta igual (Express solo lo saca
+// del limbo, todavía hace falta algo que le conteste al cliente).
+app.use((err, req, res, next) => {
+  console.error('Error no manejado en', req.method, req.path, ':', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: err.message || 'Error interno del servidor' });
 });
 
 init()

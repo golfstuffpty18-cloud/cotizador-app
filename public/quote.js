@@ -128,13 +128,17 @@ function render(opp, quote) {
   if (btnUpload) btnUpload.addEventListener('click', async () => {
     if (!fileInput.files.length) { uploadMsg.textContent = 'Selecciona un archivo primero.'; return; }
     uploadMsg.textContent = 'Subiendo y leyendo el Excel…';
-    const fd = new FormData();
-    fd.append('file', fileInput.files[0]);
-    const res = await fetch(`/api/opportunities/${oppId}/quote/upload`, { method: 'POST', body: fd });
-    const data = await res.json();
-    if (!res.ok) { uploadMsg.textContent = '❌ ' + (data.error || 'Error al subir el archivo'); return; }
-    uploadMsg.textContent = data.isKnownTemplate ? '✅ Excel leído correctamente.' : '⚠️ Archivo leído, pero no parece ser la plantilla generada por la app — revisa la vista previa.';
-    load();
+    try {
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      const res = await fetch(`/api/opportunities/${oppId}/quote/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { uploadMsg.textContent = '❌ ' + (data.error || 'Error al subir el archivo'); return; }
+      uploadMsg.textContent = data.isKnownTemplate ? '✅ Excel leído correctamente.' : '⚠️ Archivo leído, pero no parece ser la plantilla generada por la app — revisa la vista previa.';
+      load();
+    } catch (err) {
+      uploadMsg.textContent = '❌ Error al subir el archivo: ' + err.message + '. Intenta de nuevo.';
+    }
   });
 
   const btnApprove = document.getElementById('btnApprove');
