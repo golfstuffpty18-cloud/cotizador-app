@@ -33,12 +33,20 @@ async function getAccessToken() {
   return cachedToken;
 }
 
+// Los títulos reales de PanamaCompra son largos (128+ caracteres es normal)
+// — recortar a ciegas con .slice(0,120) se come la extensión (".xlsx"/".pdf")
+// cuando el nombre pasa ese límite, dejando el archivo sin extensión en
+// Dropbox. Se separa la extensión antes de recortar y se vuelve a pegar al
+// final para que siempre sobreviva.
 function sanitizeFilename(name) {
-  return String(name || 'Cotizacion')
+  const clean = String(name || 'Cotizacion')
     .replace(/[\\/:*?"<>|]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
+    .trim();
+  const m = clean.match(/^(.*)(\.[a-zA-Z0-9]{1,5})$/);
+  if (!m) return clean.slice(0, 120);
+  const [, base, ext] = m;
+  return base.slice(0, 120 - ext.length).trim() + ext;
 }
 
 // El header Dropbox-API-Arg viaja como header HTTP, que solo admite ASCII.
