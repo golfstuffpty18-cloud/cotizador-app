@@ -18,6 +18,7 @@ const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
 const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
+const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -322,6 +323,17 @@ app.all('/api/cron/check-email', async (req, res) => {
     console.error('Error en /api/cron/check-email:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/enviadas', async (req, res) => {
+  res.json(await listarEnviadas());
+});
+
+app.get('/api/enviadas/:idProcesosContratacion/cuadro', async (req, res) => {
+  const { numProceso } = req.query;
+  if (!numProceso) return res.status(400).json({ error: 'falta numProceso' });
+  const cuadro = await obtenerCuadroComparativo({ idProcesosContratacion: req.params.idProcesosContratacion, numProceso });
+  res.json(cuadro);
 });
 
 app.post('/api/search/panamacompra', async (req, res) => {

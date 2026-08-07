@@ -87,6 +87,39 @@ async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
   return todos;
 }
 
+// Procesos donde la empresa YA envió oferta. Mismo endpoint que
+// buscarPorEstados, agregando enviada:true al filtro — descubierto leyendo
+// el bundle JS del portal-interno de PanamaCompra (así arma la pantalla
+// "Cotización en línea > Enviadas") y confirmado en vivo contra la cuenta
+// real de la empresa.
+async function buscarEnviadas(cookie, registrosPorPagina = 100) {
+  const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
+    method: 'POST',
+    headers: { ...COMMON_HEADERS, Cookie: cookie },
+    body: JSON.stringify({
+      registrosPorPagina,
+      valorSiguiente: '',
+      filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado: 0, enviada: true, numProceso: '' },
+    }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Búsqueda de enviadas falló: HTTP ${res.status}`);
+  const json = await res.json();
+  return json.result.registros || [];
+}
+
+// Cuadro comparativo de precios entre todos los participantes de un
+// proceso. Solo lo llena PanamaCompra después de que cierra la ventana de
+// recepción de ofertas del acto — antes de eso, responde vacío.
+async function cuadroPropuesta(cookie, tipoProceso, p, d) {
+  const res = await fetch(`${BASE}/documentos-actos-publico/cuadroPropuesta/${tipoProceso}/${p}/${d}`, {
+    headers: { ...COMMON_HEADERS, Cookie: cookie },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Cuadro de propuesta falló: HTTP ${res.status}`);
+  return res.json();
+}
+
 async function verPliego(cookie, idProcesosContratacionFlujos) {
   const res = await fetch(
     `${BASE}/procesos-configuracion/pagina-componentes/2/procesoVistaPliego/${idProcesosContratacionFlujos}`,
@@ -157,4 +190,7 @@ function extraerPrecio(texto) {
   return m ? parseFloat(m[1]) : null;
 }
 
-module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, verPliego, descargarArchivo, extraerPrecio, ESTADO };
+module.exports = {
+  login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas,
+  verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, ESTADO, TIPO_PROCESO_COTIZACION,
+};

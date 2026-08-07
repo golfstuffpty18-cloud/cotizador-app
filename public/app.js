@@ -75,13 +75,17 @@ enableBtn.addEventListener('click', () => {
 });
 
 const searchBtn = document.getElementById('searchBtn');
+// El ícono de búsqueda vive dentro de un botón con ícono+etiqueta
+// (.qa-icon/.qa-label) — el "cargando" solo debe reemplazar el ícono, no
+// todo el contenido del botón (si no, se pierde la etiqueta de texto).
+const searchIcon = searchBtn ? searchBtn.querySelector('.qa-icon') : null;
 if (searchBtn) {
   searchBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     if (searchBtn.dataset.loading === '1') return;
     searchBtn.dataset.loading = '1';
-    const original = searchBtn.textContent;
-    searchBtn.textContent = '⏳';
+    const original = searchIcon.textContent;
+    searchIcon.textContent = '⏳';
     statusEl.textContent = 'Buscando en PanamaCompra por rubro… puede tardar unos segundos.';
     try {
       const res = await fetch('/api/search/panamacompra', { method: 'POST' });
@@ -95,7 +99,7 @@ if (searchBtn) {
     } catch (err) {
       statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
     } finally {
-      searchBtn.textContent = original;
+      searchIcon.textContent = original;
       searchBtn.dataset.loading = '';
     }
   });

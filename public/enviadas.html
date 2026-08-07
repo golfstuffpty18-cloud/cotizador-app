@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotizaciones enviadas | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<style>
+  :root{
+    --blue:#1616e6; --navy:#0a0a1a;
+    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--gray-50); color:#10101f;
+  }
+  header{
+    background: var(--navy); color:#fff; padding:16px 20px;
+    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10;
+  }
+  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
+  header h1{ font-size:.95rem; margin:0; font-weight:700; flex:1; }
+
+  main{ padding:14px 14px 40px; max-width:640px; margin:0 auto; }
+  .card{
+    background:#fff; border-radius:14px; padding:18px; margin-bottom:14px;
+    box-shadow:0 10px 24px -16px rgba(10,10,26,.25); border-left:6px solid var(--blue);
+  }
+  .badge{
+    display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-bottom:8px;
+    background:#e6ecfe; color:var(--blue);
+  }
+  .card .title{ font-size:.95rem; font-weight:700; color:var(--navy); margin-bottom:6px; }
+  .card .meta{ font-size:.78rem; color:var(--gray-600); margin-bottom:10px; }
+  .card .meta b{ color:var(--navy); }
+
+  .btn{ padding:10px 14px; border-radius:999px; border:2px solid var(--gray-100); background:#fff; color:var(--navy); font-weight:700; font-size:.82rem; cursor:pointer; width:100%; }
+  .btn:disabled{ color:var(--gray-400); cursor:default; }
+  .pending{ font-size:.78rem; color:var(--gray-400); text-align:center; padding:8px; }
+
+  .cuadro-wrap{ margin-top:12px; }
+  table.cuadro{ width:100%; border-collapse:collapse; font-size:.8rem; }
+  table.cuadro th, table.cuadro td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--gray-100); }
+  table.cuadro th{ color:var(--gray-400); font-weight:700; text-transform:uppercase; font-size:.68rem; }
+  table.cuadro tr.ganador td{ font-weight:700; color:var(--blue); }
+  .sin-datos{ font-size:.8rem; color:var(--gray-400); text-align:center; padding:14px 0; }
+
+  .empty{ text-align:center; color:var(--gray-400); padding:40px 20px; font-size:.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">←</a>
+  <h1>Cotizaciones enviadas</h1>
+</header>
+
+<main>
+  <div id="list">Cargando…</div>
+</main>
+
+<script src="/enviadas.js"></script>
+</body>
+</html>

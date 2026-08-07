@@ -25,6 +25,19 @@
   header h1{ font-size:1rem; margin:0; font-weight:700; }
   header p{ margin:0; font-size:.72rem; color:rgba(255,255,255,.6); }
 
+  .quick-actions{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+    margin:14px 16px 4px; max-width:640px; margin-left:auto; margin-right:auto;
+    padding-left:14px; padding-right:14px;
+  }
+  .qa-btn{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:14px 6px; border-radius:14px; background:#fff; text-decoration:none;
+    color:var(--navy); box-shadow:0 10px 24px -16px rgba(10,10,26,.25);
+  }
+  .qa-icon{ font-size:1.7rem; }
+  .qa-label{ font-size:.68rem; font-weight:700; }
+
   #enableBtn{
     margin:14px 16px; padding:12px 16px; border-radius:12px; border:2px solid transparent;
     background:var(--blue); color:#fff; font-weight:700; font-size:.9rem; width:calc(100% - 32px);
@@ -82,10 +95,22 @@
     <h1>Cotizador GS Technologies</h1>
     <p>Oportunidades de PanamaCompra</p>
   </div>
-  <a href="#" id="searchBtn" style="color:#fff;text-decoration:none;font-size:1.3rem" title="Buscar en PanamaCompra por rubro">🔍</a>
-  <a href="/directo.html" style="color:#fff;text-decoration:none;font-size:1.3rem" title="Cotizaciones directas (fuera de PanamaCompra)">🧾</a>
-  <a href="/catalog.html" style="color:#fff;text-decoration:none;font-size:1.3rem" title="Catálogo de equipos">📋</a>
 </header>
+
+<nav class="quick-actions">
+  <a href="#" id="searchBtn" class="qa-btn" title="Buscar en PanamaCompra por rubro">
+    <span class="qa-icon">🔍</span><span class="qa-label">Buscar</span>
+  </a>
+  <a href="/enviadas.html" class="qa-btn" title="Cotizaciones enviadas">
+    <span class="qa-icon">📊</span><span class="qa-label">Enviadas</span>
+  </a>
+  <a href="/directo.html" class="qa-btn" title="Cotizaciones directas (fuera de PanamaCompra)">
+    <span class="qa-icon">🧾</span><span class="qa-label">Directas</span>
+  </a>
+  <a href="/catalog.html" class="qa-btn" title="Catálogo de equipos">
+    <span class="qa-icon">📋</span><span class="qa-label">Catálogo</span>
+  </a>
+</nav>
 
 <button id="enableBtn">Activar notificaciones</button>
 <div id="status"></div>
