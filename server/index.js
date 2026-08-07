@@ -329,10 +329,8 @@ app.get('/api/enviadas', async (req, res) => {
   res.json(await listarEnviadas());
 });
 
-app.get('/api/enviadas/:idProcesosContratacion/cuadro', async (req, res) => {
-  const { numProceso } = req.query;
-  if (!numProceso) return res.status(400).json({ error: 'falta numProceso' });
-  const cuadro = await obtenerCuadroComparativo({ idProcesosContratacion: req.params.idProcesosContratacion, numProceso });
+app.get('/api/enviadas/:idProcesosContratacionFlujos/cuadro', async (req, res) => {
+  const cuadro = await obtenerCuadroComparativo({ idProcesosContratacionFlujos: req.params.idProcesosContratacionFlujos });
   res.json(cuadro);
 });
 

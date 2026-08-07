@@ -15,7 +15,7 @@ const listEl = document.getElementById('list');
 
 async function loadCuadro(op, wrap) {
   wrap.innerHTML = '<p class="sin-datos">Consultando PanamaCompra…</p>';
-  const res = await fetch(`/api/enviadas/${op.idProcesosContratacion}/cuadro?numProceso=${encodeURIComponent(op.numProceso)}`);
+  const res = await fetch(`/api/enviadas/${op.idProcesosContratacionFlujos}/cuadro`);
   const data = await res.json();
   if (!res.ok) { wrap.innerHTML = `<p class="sin-datos">❌ ${escapeHtml(data.error || 'Error consultando el cuadro')}</p>`; return; }
 
