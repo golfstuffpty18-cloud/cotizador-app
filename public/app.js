@@ -87,7 +87,10 @@ if (searchBtn) {
       const res = await fetch('/api/search/panamacompra', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error en la búsqueda');
-      statusEl.textContent = `Búsqueda lista: ${data.nuevas} nueva(s) de ${data.candidatas} candidata(s) por rubro (${data.totalConsultadas} abiertas/programadas revisadas).`;
+      const { abiertas, programadas } = data;
+      statusEl.textContent =
+        `Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s) (${abiertas.totalConsultadas} revisadas). ` +
+        `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`;
       await loadOpportunities();
     } catch (err) {
       statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
