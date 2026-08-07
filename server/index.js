@@ -11,6 +11,7 @@ const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
 const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
+const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -128,7 +129,20 @@ app.post('/api/opportunities/:id/decision', async (req, res) => {
     [decision, req.params.id]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  if (decision === 'participar') syncOpportunityDocs(rows[0]); // en segundo plano, no bloquea la respuesta
   res.json(rows[0]);
+});
+
+// Re-sincroniza manualmente los documentos adjuntos del acto (carpeta de
+// Dropbox del cliente + texto extraído). Sirve para oportunidades que ya
+// estaban en 'participar' antes de que existiera esta función, o para volver
+// a intentar si algo cambió en el portal. Corre en segundo plano igual que
+// el disparador automático — la respuesta no espera a que termine.
+app.post('/api/opportunities/:id/sync-documentos', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  syncOpportunityDocs(rows[0]);
+  res.json({ ok: true, mensaje: 'Buscando documentos adjuntos en segundo plano…' });
 });
 
 app.get('/api/opportunities/:id', async (req, res) => {
@@ -215,7 +229,8 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
-  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer); // respaldo best-effort, no bloquea la descarga
+  const dropboxSubfolder = opportunity.decision === 'participar' ? (opportunity.entity || opportunity.title) : undefined;
+  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer, dropboxSubfolder); // respaldo best-effort, no bloquea la descarga
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
   res.send(buffer);
@@ -248,7 +263,8 @@ app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
   const opportunity = oppRows[0];
 
   const pdfBuffer = await generateQuotePdf({ quote, opportunity });
-  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.pdf`, pdfBuffer); // respaldo best-effort, no bloquea la aprobación
+  const dropboxSubfolder = opportunity.decision === 'participar' ? (opportunity.entity || opportunity.title) : undefined;
+  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.pdf`, pdfBuffer, dropboxSubfolder); // respaldo best-effort, no bloquea la aprobación
 
   await pool.query(
     `UPDATE quotes SET estado = 'aprobada', pdf = $1, approved_at = now(), updated_at = now() WHERE opportunity_id = $2`,

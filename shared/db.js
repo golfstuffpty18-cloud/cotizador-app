@@ -108,6 +108,8 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_province TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS tecnologia_incendio TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'panamacompra';
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS documentos_pliego JSONB;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS documentos_synced_at TIMESTAMPTZ;
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS subcategoria TEXT;
 `;
 

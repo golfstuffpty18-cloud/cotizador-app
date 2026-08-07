@@ -41,19 +41,34 @@ function sanitizeFilename(name) {
     .slice(0, 120);
 }
 
+// El header Dropbox-API-Arg viaja como header HTTP, que solo admite ASCII.
+// JSON.stringify deja pasar tal cual cualquier tilde/ñ/etc. (UTF-8), y
+// fetch()/undici rechaza (o corrompe) headers con esos bytes — por eso subir
+// un archivo con un título que trae tildes (ej. "COMUNICACIÓN") fallaba en
+// silencio: uploadToDropboxSafe nunca lanza, así que no se veía el error en
+// ningún lado salvo los logs de Render. Dropbox documenta este requisito:
+// hay que escapar todo carácter fuera de ASCII imprimible como \uXXXX antes
+// de mandarlo en el header (el path en sí puede tener cualquier Unicode, es
+// el HEADER el que debe ser ASCII puro).
+function asciiSafeJson(obj) {
+  return JSON.stringify(obj).replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+
 // Nunca lanza: es un respaldo secundario y no debe romper la descarga o
 // aprobación real que el usuario está esperando si Dropbox falla o las
 // credenciales todavía no están configuradas.
-async function uploadToDropboxSafe(filename, buffer) {
+async function uploadToDropboxSafe(filename, buffer, subfolder) {
   try {
     const accessToken = await getAccessToken();
-    const dropboxPath = `${FOLDER}/${sanitizeFilename(filename)}`;
+    const dropboxPath = subfolder
+      ? `${FOLDER}/${sanitizeFilename(subfolder)}/${sanitizeFilename(filename)}`
+      : `${FOLDER}/${sanitizeFilename(filename)}`;
     const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath, mode: 'overwrite', mute: true }),
+        'Dropbox-API-Arg': asciiSafeJson({ path: dropboxPath, mode: 'overwrite', mute: true }),
       },
       body: buffer,
       signal: AbortSignal.timeout(30000),

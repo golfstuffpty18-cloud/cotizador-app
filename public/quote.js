@@ -38,7 +38,15 @@ function render(opp, quote) {
         ${opp.source === 'directo' ? escapeHtml(opp.title) : `<b>${opp.act_number}</b> — ${escapeHtml(opp.title)}`}
       </p>
       ${esIncendio && opp.tecnologia_incendio ? `<p style="margin:8px 0 0;font-size:.78rem;color:var(--blue);font-weight:700">Tecnología: ${escapeHtml(opp.tecnologia_incendio)}</p>` : ''}
+      ${opp.entity || opp.entity_address || opp.entity_province || opp.window_info ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-100);font-size:.8rem;color:var(--gray-600)">
+        ${opp.entity ? `<p style="margin:0 0 4px"><b>Entidad:</b> ${escapeHtml(opp.entity)}</p>` : ''}
+        ${opp.entity_address ? `<p style="margin:0 0 4px"><b>Dirección:</b> ${escapeHtml(opp.entity_address)}${opp.entity_province ? `, ${escapeHtml(opp.entity_province)}` : ''}</p>` : ''}
+        ${opp.window_info ? `<p style="margin:0"><b>Ventana:</b> ${escapeHtml(opp.window_info)}</p>` : ''}
+      </div>` : ''}
     </section>
+
+    ${opp.source === 'panamacompra' ? renderDocumentos(opp) : ''}
 
     ${needsTecnologia ? `
     <section>
@@ -107,6 +115,13 @@ function render(opp, quote) {
   if (btnConvencional) btnConvencional.addEventListener('click', () => setTecnologia('Convencional'));
   if (btnDireccionable) btnDireccionable.addEventListener('click', () => setTecnologia('Direccionable'));
 
+  const btnSyncDocs = document.getElementById('btnSyncDocs');
+  const syncDocsMsg = document.getElementById('syncDocsMsg');
+  if (btnSyncDocs) btnSyncDocs.addEventListener('click', async () => {
+    syncDocsMsg.textContent = 'Buscando documentos en PanamaCompra y subiéndolos a Dropbox… esto corre en segundo plano, puedes volver a pulsar el botón en unos segundos para ver el resultado.';
+    await fetch(`/api/opportunities/${oppId}/sync-documentos`, { method: 'POST' });
+  });
+
   const fileInput = document.getElementById('fileInput');
   const btnUpload = document.getElementById('btnUpload');
   const uploadMsg = document.getElementById('uploadMsg');
@@ -132,6 +147,30 @@ function render(opp, quote) {
     msg.textContent = 'Cotización aprobada ✅';
     load();
   });
+}
+
+function renderDocumentos(opp) {
+  const documentos = Array.isArray(opp.documentos_pliego) ? opp.documentos_pliego : [];
+  const lista = documentos.map(d => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
+      <p style="margin:0;font-size:.82rem;font-weight:700;color:var(--navy)">${escapeHtml(d.nombreOriginal)}</p>
+      <p style="margin:2px 0 0;font-size:.75rem;color:var(--gray-400)">${escapeHtml(d.tipoArchivo || '')}${d.descripcion ? ' · ' + escapeHtml(d.descripcion) : ''}</p>
+      ${d.textoExtraido ? `
+        <details style="margin-top:6px">
+          <summary style="font-size:.76rem;color:var(--blue);cursor:pointer">Ver texto extraído</summary>
+          <pre style="white-space:pre-wrap;font-family:inherit;font-size:.74rem;color:var(--gray-600);background:var(--gray-50);padding:10px;border-radius:8px;margin-top:6px;max-height:280px;overflow-y:auto">${escapeHtml(d.textoExtraido)}</pre>
+        </details>` : ''}
+    </div>
+  `).join('');
+
+  return `
+    <section>
+      <h2>Documentos adjuntos</h2>
+      <button type="button" class="btn btn-ghost" id="btnSyncDocs" style="width:100%;margin-bottom:10px">🔄 Buscar documentos adjuntos</button>
+      <div id="syncDocsMsg" style="font-size:.78rem;color:var(--gray-600);margin-bottom:${documentos.length ? '10px' : '0'}"></div>
+      ${documentos.length ? lista : (opp.documentos_synced_at ? '<p style="font-size:.8rem;color:var(--gray-400);margin:0">Este acto no trae documentos adjuntos en PanamaCompra.</p>' : '<p style="font-size:.8rem;color:var(--gray-400);margin:0">Aún no se han buscado los documentos adjuntos de este acto.</p>')}
+    </section>
+  `;
 }
 
 function renderPreview(quote) {

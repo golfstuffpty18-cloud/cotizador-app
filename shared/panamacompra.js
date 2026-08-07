@@ -98,6 +98,7 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
 
   const campos = {};
   let items = [];
+  let archivos = [];
   for (const sec of secciones) {
     if (!Array.isArray(sec.value)) continue;
     if (sec.titulo === 'Ítems de la cotización') {
@@ -115,11 +116,39 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
         .sort((a, b) => (a.numRenglon || 0) - (b.numRenglon || 0));
       continue;
     }
+    // Sección "Archivos de la cotización" (tipo componentFiles): pliego,
+    // especificaciones técnicas, diseños, etc. — antes se descartaba en
+    // silencio porque no calzaba con el patrón genérico {nombre, value} de
+    // abajo.
+    if (sec.tipo === 'componentFiles') {
+      archivos = sec.value
+        .filter(f => f && f.rutaCompleta)
+        .map(f => ({
+          tipoArchivo: f.tipoArchivo || '',
+          descripcion: f.descripcion || '',
+          nombreOriginal: f.nombreOriginal || 'documento',
+          rutaCompleta: f.rutaCompleta,
+          mimetype: f.mimetype || '',
+          extension: f.extension || '',
+        }));
+      continue;
+    }
     for (const item of sec.value) {
       if (item && item.nombre) campos[item.nombre.trim()] = item.value;
     }
   }
-  return { campos, items };
+  return { campos, items, archivos };
+}
+
+// Descarga el binario de un adjunto del pliego (rutaCompleta viene de
+// verPliego). Requiere la misma cookie de sesión de PanamaCompra.
+async function descargarArchivo(cookie, rutaCompleta) {
+  const res = await fetch(`${BASE}${rutaCompleta}`, {
+    headers: { ...COMMON_HEADERS, Accept: '*/*', Cookie: cookie },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Descarga de archivo falló: HTTP ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 function extraerPrecio(texto) {
@@ -128,4 +157,4 @@ function extraerPrecio(texto) {
   return m ? parseFloat(m[1]) : null;
 }
 
-module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, verPliego, extraerPrecio, ESTADO };
+module.exports = { login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, verPliego, descargarArchivo, extraerPrecio, ESTADO };
