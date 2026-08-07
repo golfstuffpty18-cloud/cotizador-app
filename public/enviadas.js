@@ -25,7 +25,7 @@ async function loadCuadro(op, wrap) {
   }
 
   const rows = data.proveedores.map((p, i) => `
-    <tr class="${i === 0 ? 'ganador' : ''}">
+    <tr class="${/GS TECHNOLOGIES/i.test(p.nombre) ? 'propia' : ''}">
       <td>${i + 1}</td>
       <td>${escapeHtml(p.nombre)}</td>
       <td>${p.precioTotal != null ? money(p.precioTotal) : '-'}</td>

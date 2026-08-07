@@ -19,52 +19,37 @@ async function listarEnviadas() {
 }
 
 // ÚNICA función que traduce un registro de "enviadas" a los parámetros
-// p/d del endpoint cuadroPropuesta. HIPÓTESIS aún no confirmada con un caso
-// real (PanamaCompra no llena el cuadro hasta que cierra el acto, y al
-// momento de escribir esto ningún proceso de la cuenta había llegado a esa
-// etapa). p = numProceso (string) y d = idProcesosContratacion (numérico)
-// son los dos identificadores del mismo registro más consistentes con la
-// forma de la URL del portal (`cuadroPropuesta/{tipoProceso}/{p}/{d}`).
-// Si el día que un acto real muestre el cuadro esto no calza, es el ÚNICO
-// lugar a corregir.
+// p/d del endpoint cuadroPropuesta. CONFIRMADO en vivo (2026-08-07) con un
+// link real que el usuario copió desde el portal-interno de PanamaCompra
+// para un proceso ya cerrado: "p" NO es un identificador del proceso —
+// es literalmente el nombre fijo de la vista ("procesoVistaCuadroPropuesta"),
+// igual para cualquier proceso. El identificador real del proceso es "d",
+// y corresponde a idProcesosContratacionFlujos (no idProcesosContratacion).
 function mapearParametrosCuadro(registro) {
   return {
     tipoProceso: pc.TIPO_PROCESO_COTIZACION,
-    p: registro.numProceso,
-    d: registro.idProcesosContratacion,
+    p: 'procesoVistaCuadroPropuesta',
+    d: registro.idProcesosContratacionFlujos,
   };
 }
 
-function extraerPrecioProveedor(item) {
-  const candidatos = [item.montoTotal, item.total, item.precioTotal, item.monto, item.precio, item.montoOferta];
-  for (const c of candidatos) {
-    const n = Number(c);
-    if (c != null && !Number.isNaN(n)) return n;
-  }
-  return null;
-}
-
-// La forma real de una respuesta con datos todavía no se ha visto (solo
-// result:[] hasta ahora) — se normaliza de forma tolerante a un par de
-// formas razonables, y si no calza con ninguna, se marca reconocido:false
-// con el crudo adjunto para poder diagnosticar sin necesidad de redeploy.
+// Forma real confirmada (result.ofertasGlobal[]): cada oferta trae
+// empresa.nombreComercial y un precioTotal ya sumado (todos los renglones +
+// ITBMS). El usuario pidió mostrar SOLO el precio final por proponente,
+// omitiendo el resto (desglose por ítem, fechas, códigos internos, etc.).
 function normalizarCuadro(raw) {
-  let listaProveedor = null;
-  if (Array.isArray(raw) && raw.length) listaProveedor = raw;
-  else if (raw && Array.isArray(raw.listaProveedor)) listaProveedor = raw.listaProveedor;
-
-  if (!listaProveedor) {
-    return { reconocido: raw != null, proveedores: [], raw };
+  if (!raw || !Array.isArray(raw.ofertasGlobal)) {
+    return { reconocido: false, proveedores: [] };
   }
 
-  const proveedores = listaProveedor
-    .map(p => ({
-      nombre: p.nombreProveedor || p.proveedor || p.nombre || 'Proveedor sin nombre',
-      precioTotal: extraerPrecioProveedor(p),
+  const proveedores = raw.ofertasGlobal
+    .map(o => ({
+      nombre: (o.empresa && o.empresa.nombreComercial) || 'Proveedor sin nombre',
+      precioTotal: o.precioTotal != null ? Number(o.precioTotal) : null,
     }))
-    .sort((a, b) => (a.precioTotal ?? Infinity) - (b.precioTotal ?? Infinity)); // menor a mayor
+    .sort((a, b) => (b.precioTotal ?? -Infinity) - (a.precioTotal ?? -Infinity)); // mayor a menor
 
-  return { reconocido: true, proveedores, raw };
+  return { reconocido: true, proveedores };
 }
 
 async function obtenerCuadroComparativo(registro) {
