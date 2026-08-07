@@ -259,6 +259,22 @@ app.post('/api/opportunities/:id/quote/upload', upload.single('file'), async (re
   res.json({ ...rest, isKnownTemplate: parsed.isKnownTemplate });
 });
 
+// Reabre una cotización ya aprobada para poder modificarla (ej. el cliente
+// pidió un cambio después de recibir el PDF). Vuelve el estado a 'borrador'
+// para que Paso 1/Paso 2 se puedan usar de nuevo con los últimos datos
+// guardados; el PDF anterior sigue disponible hasta que se apruebe de
+// nuevo, momento en el que se reemplaza (mismo comportamiento que ya tenía
+// el respaldo en Dropbox, que sube en modo "overwrite").
+app.post('/api/opportunities/:id/quote/unlock', async (req, res) => {
+  const { rows } = await pool.query(
+    `UPDATE quotes SET estado = 'borrador', updated_at = now() WHERE opportunity_id = $1 AND estado = 'aprobada' RETURNING *`,
+    [req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no hay una cotización aprobada para modificar' });
+  const { pdf, ...rest } = rows[0];
+  res.json(rest);
+});
+
 app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
   const oppId = req.params.id;
   const { rows } = await pool.query('SELECT * FROM quotes WHERE opportunity_id = $1', [oppId]);

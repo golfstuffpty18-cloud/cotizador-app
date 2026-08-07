@@ -30,7 +30,7 @@ function render(opp, quote) {
   const needsTecnologia = esIncendio && !opp.tecnologia_incendio && !locked;
 
   app.innerHTML = `
-    ${locked ? `<div class="locked-banner">✅ Cotización aprobada — ya no se puede editar. Descarga el PDF abajo.</div>` : ''}
+    ${locked ? `<div class="locked-banner">✅ Cotización aprobada. Descarga el PDF abajo, o modifícala si necesitas cambiar algo.</div>` : ''}
 
     <section>
       <h2>${opp.source === 'directo' ? 'Cliente' : 'Proceso'}</h2>
@@ -93,6 +93,7 @@ function render(opp, quote) {
     ${locked ? `
       <div class="actions">
         <a class="btn btn-primary" style="text-align:center;text-decoration:none;line-height:1.6" href="/api/opportunities/${oppId}/quote/pdf" target="_blank">Descargar PDF</a>
+        <button class="btn btn-ghost" id="btnUnlock" style="width:100%">✏️ Modificar cotización</button>
       </div>
     ` : (hasDraft ? `
       <div class="actions">
@@ -139,6 +140,16 @@ function render(opp, quote) {
     } catch (err) {
       uploadMsg.textContent = '❌ Error al subir el archivo: ' + err.message + '. Intenta de nuevo.';
     }
+  });
+
+  const btnUnlock = document.getElementById('btnUnlock');
+  if (btnUnlock) btnUnlock.addEventListener('click', async () => {
+    if (!confirm('¿Modificar esta cotización? El PDF ya generado seguirá disponible para descargar hasta que apruebes de nuevo con los cambios.')) return;
+    const msg = document.getElementById('msg');
+    msg.textContent = 'Reabriendo cotización…';
+    const res = await fetch(`/api/opportunities/${oppId}/quote/unlock`, { method: 'POST' });
+    if (!res.ok) { msg.textContent = 'Error al reabrir la cotización'; return; }
+    load();
   });
 
   const btnApprove = document.getElementById('btnApprove');
