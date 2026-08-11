@@ -10,6 +10,15 @@ const COMMON_HEADERS = {
 const ESTADO = { ABIERTA: 8, CERRADA: 9, CANCELADO: 4, PROGRAMADA: 15 };
 const TIPO_PROCESO_COTIZACION = 2;
 
+// "Compra Menor que exceda B/.10,000 hasta B/.50,000" — un tipo de proceso
+// totalmente distinto a "Cotización en línea" (no un simple rango de precio
+// sobre el mismo tipo, como se asumió al principio). Confirmado en vivo con
+// un acto real: idTipoProceso 6, idEstado 36 = "Vigente" (el estado donde
+// todavía se puede presentar propuesta — no tiene un equivalente separado
+// de "Programada" como Cotización en línea).
+const TIPO_PROCESO_COMPRA_MENOR = 6;
+const ESTADO_COMPRA_MENOR = { VIGENTE: 36 };
+
 // Sin esto, una llamada a PanamaCompra que nunca responde deja colgado el
 // chequeo de correo para siempre: fetch() de Node no tiene timeout por
 // defecto, así que un solo request atascado bloquea (running=true) todos
@@ -34,14 +43,14 @@ async function login(usuario, contrasena) {
   return cookie;
 }
 
-async function buscarProceso(cookie, numProceso, idEstado) {
+async function buscarProceso(cookie, numProceso, idEstado, idTipoProceso = TIPO_PROCESO_COTIZACION) {
   const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
     method: 'POST',
     headers: { ...COMMON_HEADERS, Cookie: cookie },
     body: JSON.stringify({
       registrosPorPagina: 10,
       valorSiguiente: '',
-      filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado, numProceso },
+      filtro: { idTipoProceso, idEstado, numProceso },
     }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -60,6 +69,12 @@ async function buscarProcesoCualquierEstado(cookie, numProceso) {
     const registros = await buscarProceso(cookie, numProceso, idEstado);
     if (registros.length) return registros;
   }
+  // También puede ser un acto de "Compra Menor" (tipo de proceso distinto,
+  // con muchos más estados posibles que Cotización en línea — Vigente,
+  // Adjudicado, Desierto, Por adjudicar, etc.) — se busca con idEstado:0
+  // (cualquier estado) en vez de enumerarlos todos uno por uno.
+  const compraMenor = await buscarProceso(cookie, numProceso, 0, TIPO_PROCESO_COMPRA_MENOR);
+  if (compraMenor.length) return compraMenor;
   return [];
 }
 
@@ -67,7 +82,7 @@ async function buscarProcesoCualquierEstado(cookie, numProceso) {
 // pedidos (no filtrados por número de proceso), para poder buscar
 // manualmente por rubro entre todo lo publicado en PanamaCompra (abierto y
 // programado), sin depender de que llegue el correo de aviso.
-async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
+async function buscarPorEstados(cookie, estados, registrosPorPagina = 500, idTipoProceso = TIPO_PROCESO_COTIZACION) {
   const todos = [];
   for (const idEstado of estados) {
     const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
@@ -76,7 +91,7 @@ async function buscarPorEstados(cookie, estados, registrosPorPagina = 500) {
       body: JSON.stringify({
         registrosPorPagina,
         valorSiguiente: '',
-        filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado, numProceso: '' },
+        filtro: { idTipoProceso, idEstado, numProceso: '' },
       }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
@@ -120,9 +135,13 @@ async function cuadroPropuesta(cookie, tipoProceso, p, d) {
   return res.json();
 }
 
-async function verPliego(cookie, idProcesosContratacionFlujos) {
+async function verPliego(cookie, idProcesosContratacionFlujos, idTipoProceso = TIPO_PROCESO_COTIZACION) {
+  // El segmento que parecía una constante fija ("2") es en realidad el
+  // idTipoProceso — coincidía por casualidad con Cotización en línea, que
+  // también es tipo 2. Para otros tipos (ej. Compra Menor = 6) hay que
+  // pasar el valor real, si no la API responde "Proceso Denegado".
   const res = await fetch(
-    `${BASE}/procesos-configuracion/pagina-componentes/2/procesoVistaPliego/${idProcesosContratacionFlujos}`,
+    `${BASE}/procesos-configuracion/pagina-componentes/${idTipoProceso}/procesoVistaPliego/${idProcesosContratacionFlujos}`,
     { headers: { ...COMMON_HEADERS, Cookie: cookie }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
   );
   if (!res.ok) throw new Error(`Ver pliego falló: HTTP ${res.status}`);
@@ -134,7 +153,11 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
   let archivos = [];
   for (const sec of secciones) {
     if (!Array.isArray(sec.value)) continue;
-    if (sec.titulo === 'Ítems de la cotización') {
+    // Se identifica por sec.tipo, no por el título — el título cambia según
+    // el tipo de proceso ("Ítems de la cotización" en Cotización en línea,
+    // "Ítems de compra menor" en Compra Menor), pero el tipo de componente
+    // ("componentItems") es el mismo en ambos.
+    if (sec.tipo === 'componentItems') {
       items = sec.value
         .filter(i => i && typeof i.descripcion === 'string')
         .map(i => ({
@@ -149,10 +172,10 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
         .sort((a, b) => (a.numRenglon || 0) - (b.numRenglon || 0));
       continue;
     }
-    // Sección "Archivos de la cotización" (tipo componentFiles): pliego,
-    // especificaciones técnicas, diseños, etc. — antes se descartaba en
-    // silencio porque no calzaba con el patrón genérico {nombre, value} de
-    // abajo.
+    // Sección de archivos adjuntos (pliego, especificaciones técnicas,
+    // diseños, etc.), identificada igual por tipo de componente — antes se
+    // descartaba en silencio porque no calzaba con el patrón genérico
+    // {nombre, value} de abajo.
     if (sec.tipo === 'componentFiles') {
       archivos = sec.value
         .filter(f => f && f.rutaCompleta)
@@ -170,6 +193,20 @@ async function verPliego(cookie, idProcesosContratacionFlujos) {
       if (item && item.nombre) campos[item.nombre.trim()] = item.value;
     }
   }
+
+  // Alias de campos: distintos tipos de proceso usan etiquetas distintas
+  // para el mismo dato (ej. Compra Menor dice "Precio de referencia" y
+  // "Fecha y hora presentación de propuestas" donde Cotización en línea
+  // dice "Precio estimado" y "...de cotizaciones"). Se normalizan a las
+  // claves que ya usa el resto del código, para no tener que enseñarle
+  // estas variantes a cada consumidor de verPliego.
+  if (campos['Precio estimado'] == null && campos['Precio de referencia'] != null) {
+    campos['Precio estimado'] = campos['Precio de referencia'];
+  }
+  if (campos['Fecha y hora presentación de cotizaciones'] == null && campos['Fecha y hora presentación de propuestas'] != null) {
+    campos['Fecha y hora presentación de cotizaciones'] = campos['Fecha y hora presentación de propuestas'];
+  }
+
   return { campos, items, archivos };
 }
 
@@ -193,4 +230,5 @@ function extraerPrecio(texto) {
 module.exports = {
   login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas,
   verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, ESTADO, TIPO_PROCESO_COTIZACION,
+  TIPO_PROCESO_COMPRA_MENOR, ESTADO_COMPRA_MENOR,
 };

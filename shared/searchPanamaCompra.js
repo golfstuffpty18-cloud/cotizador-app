@@ -12,15 +12,14 @@ const { upsertOpportunity } = require('./opportunities');
 // se revisara ninguna Programada.
 const MAX_DETALLES = 30;
 
-// Busca, dentro de UN estado (Abierta o Programada), las cotizaciones que
+// Busca, dentro de UN estado y UN tipo de proceso, las cotizaciones que
 // coinciden con el rubro de la empresa, y las guarda en el mismo listado que
-// usan las detectadas por correo. `precioMin`/`precioMax` son opcionales
-// (ej. para la búsqueda por rango de $10,000-$50,000) — si se dan, un acto
-// fuera de rango NO se guarda ni se marca como procesado, para que otra
-// búsqueda sin ese filtro (o con un rango distinto) lo pueda seguir
-// encontrando después.
-async function searchOneEstado(cookie, idEstado, label, { precioMin, precioMax } = {}) {
-  const registros = await pc.buscarPorEstados(cookie, [idEstado]);
+// usan las detectadas por correo. `precioMin`/`precioMax` son opcionales —
+// si se dan, un acto fuera de rango NO se guarda ni se marca como
+// procesado, para que otra búsqueda sin ese filtro (o con un rango
+// distinto) lo pueda seguir encontrando después.
+async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioMin, precioMax } = {}) {
+  const registros = await pc.buscarPorEstados(cookie, [idEstado], undefined, idTipoProceso);
   const candidatas = registros.filter(r => evaluate({ title: r.titulo }).categoryMatch);
 
   const nuevas = [];
@@ -31,7 +30,7 @@ async function searchOneEstado(cookie, idEstado, label, { precioMin, precioMax }
     if (await isActProcessed(actNumber)) continue; // ya lo teníamos, por correo o por una búsqueda anterior
     revisadas++;
 
-    const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
+    const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos, idTipoProceso);
     const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
 
     const fueraDeRango = (precioMin != null && (referencePrice == null || referencePrice < precioMin))
@@ -80,20 +79,25 @@ async function searchOneEstado(cookie, idEstado, label, { precioMin, precioMax }
 // Complementa al chequeo de correo — no lo reemplaza.
 async function searchOpenByCategory() {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-  const abiertas = await searchOneEstado(cookie, pc.ESTADO.ABIERTA, 'Abiertas');
-  const programadas = await searchOneEstado(cookie, pc.ESTADO.PROGRAMADA, 'Programadas');
+  const abiertas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.ABIERTA, 'Abiertas');
+  const programadas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.PROGRAMADA, 'Programadas');
   return { abiertas, programadas };
 }
 
-// Misma búsqueda por rubro, pero solo entre $10,000 y $50,000 de precio de
-// referencia — el rango que cubre "Cotización en línea" para procesos por
-// encima de "Compra menor" (confirmado con el campo "Proceso posterior" del
-// pliego de un acto real).
-async function searchByPriceRange(precioMin = 10000, precioMax = 50000) {
+// Búsqueda por rubro dentro de "Compra Menor que exceda B/.10,000 hasta
+// B/.50,000" — un tipo de proceso propio (idTipoProceso 6), NO un filtro de
+// precio sobre "Cotización en línea" (esa era la implementación original,
+// corregida tras confirmar con un acto real del usuario que este rango es
+// en realidad su propio tipo de proceso en PanamaCompra). Solo existe el
+// estado "Vigente" (36) — no hay un equivalente de "Programada".
+// precioMin/precioMax quedan como resguardo defensivo, aunque por
+// construcción cualquier acto de este tipo ya cae en ese rango.
+async function searchCompraMenor(precioMin = 10000, precioMax = 50000) {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-  const abiertas = await searchOneEstado(cookie, pc.ESTADO.ABIERTA, 'Abiertas', { precioMin, precioMax });
-  const programadas = await searchOneEstado(cookie, pc.ESTADO.PROGRAMADA, 'Programadas', { precioMin, precioMax });
-  return { abiertas, programadas };
+  const vigentes = await searchOneEstado(
+    cookie, pc.TIPO_PROCESO_COMPRA_MENOR, pc.ESTADO_COMPRA_MENOR.VIGENTE, 'Vigentes', { precioMin, precioMax }
+  );
+  return { vigentes };
 }
 
-module.exports = { searchOpenByCategory, searchByPriceRange };
+module.exports = { searchOpenByCategory, searchCompraMenor };

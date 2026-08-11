@@ -31,7 +31,10 @@ async function syncOpportunityDocs(opportunity) {
       console.error(`syncOpportunityDocs: no se encontró el acto ${opportunity.act_number} en PanamaCompra`);
       return;
     }
-    const { archivos } = await pc.verPliego(cookie, registros[0].idProcesosContratacionFlujos);
+    // idTipoProceso viene del registro encontrado (puede ser Cotización en
+    // línea o Compra Menor) — verPliego lo necesita para armar la URL
+    // correcta según el tipo de proceso.
+    const { archivos } = await pc.verPliego(cookie, registros[0].idProcesosContratacionFlujos, registros[0].idTipoProceso);
 
     const subfolder = opportunity.entity || opportunity.title;
     const documentos = [];

@@ -108,9 +108,8 @@ wireSearchButton('searchBtn', '/api/search/panamacompra', ({ abiertas, programad
   `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`
 );
 
-wireSearchButton('searchRangoBtn', '/api/search/rango-precio', ({ abiertas, programadas }) =>
-  `Rango $10,000-$50,000 — Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s). ` +
-  `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s).`
+wireSearchButton('searchRangoBtn', '/api/search/rango-precio', ({ vigentes }) =>
+  `Compra Menor $10,000-$50,000 — ${vigentes.nuevas} nueva(s) de ${vigentes.candidatas} candidata(s) (${vigentes.totalConsultadas} vigentes revisadas).`
 );
 
 async function checkExistingSubscription() {
