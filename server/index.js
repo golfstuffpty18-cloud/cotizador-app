@@ -15,7 +15,7 @@ const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
-const { searchOpenByCategory } = require('../shared/searchPanamaCompra');
+const { searchOpenByCategory, searchByPriceRange } = require('../shared/searchPanamaCompra');
 const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
@@ -342,6 +342,10 @@ app.post('/api/search/panamacompra', async (req, res) => {
     console.error('Error en búsqueda manual de PanamaCompra:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.post('/api/search/rango-precio', async (req, res) => {
+  res.json(await searchByPriceRange());
 });
 
 app.all('/api/cron/test-push', async (req, res) => {

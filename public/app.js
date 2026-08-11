@@ -74,36 +74,44 @@ enableBtn.addEventListener('click', () => {
   }
 });
 
-const searchBtn = document.getElementById('searchBtn');
-// El ícono de búsqueda vive dentro de un botón con ícono+etiqueta
-// (.qa-icon/.qa-label) — el "cargando" solo debe reemplazar el ícono, no
-// todo el contenido del botón (si no, se pierde la etiqueta de texto).
-const searchIcon = searchBtn ? searchBtn.querySelector('.qa-icon') : null;
-if (searchBtn) {
-  searchBtn.addEventListener('click', async (e) => {
+// El ícono de cada botón de búsqueda vive dentro de un botón con
+// ícono+etiqueta (.qa-icon/.qa-label) — el "cargando" solo debe reemplazar
+// el ícono, no todo el contenido del botón (si no, se pierde la etiqueta).
+function wireSearchButton(btnId, endpoint, formatMessage) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const icon = btn.querySelector('.qa-icon');
+  btn.addEventListener('click', async (e) => {
     e.preventDefault();
-    if (searchBtn.dataset.loading === '1') return;
-    searchBtn.dataset.loading = '1';
-    const original = searchIcon.textContent;
-    searchIcon.textContent = '⏳';
-    statusEl.textContent = 'Buscando en PanamaCompra por rubro… puede tardar unos segundos.';
+    if (btn.dataset.loading === '1') return;
+    btn.dataset.loading = '1';
+    const original = icon.textContent;
+    icon.textContent = '⏳';
+    statusEl.textContent = 'Buscando en PanamaCompra… puede tardar unos segundos.';
     try {
-      const res = await fetch('/api/search/panamacompra', { method: 'POST' });
+      const res = await fetch(endpoint, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error en la búsqueda');
-      const { abiertas, programadas } = data;
-      statusEl.textContent =
-        `Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s) (${abiertas.totalConsultadas} revisadas). ` +
-        `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`;
+      statusEl.textContent = formatMessage(data);
       await loadOpportunities();
     } catch (err) {
       statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
     } finally {
-      searchIcon.textContent = original;
-      searchBtn.dataset.loading = '';
+      icon.textContent = original;
+      btn.dataset.loading = '';
     }
   });
 }
+
+wireSearchButton('searchBtn', '/api/search/panamacompra', ({ abiertas, programadas }) =>
+  `Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s) (${abiertas.totalConsultadas} revisadas). ` +
+  `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`
+);
+
+wireSearchButton('searchRangoBtn', '/api/search/rango-precio', ({ abiertas, programadas }) =>
+  `Rango $10,000-$50,000 — Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s). ` +
+  `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s).`
+);
 
 async function checkExistingSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;

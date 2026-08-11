@@ -14,8 +14,12 @@ const MAX_DETALLES = 30;
 
 // Busca, dentro de UN estado (Abierta o Programada), las cotizaciones que
 // coinciden con el rubro de la empresa, y las guarda en el mismo listado que
-// usan las detectadas por correo.
-async function searchOneEstado(cookie, idEstado, label) {
+// usan las detectadas por correo. `precioMin`/`precioMax` son opcionales
+// (ej. para la búsqueda por rango de $10,000-$50,000) — si se dan, un acto
+// fuera de rango NO se guarda ni se marca como procesado, para que otra
+// búsqueda sin ese filtro (o con un rango distinto) lo pueda seguir
+// encontrando después.
+async function searchOneEstado(cookie, idEstado, label, { precioMin, precioMax } = {}) {
   const registros = await pc.buscarPorEstados(cookie, [idEstado]);
   const candidatas = registros.filter(r => evaluate({ title: r.titulo }).categoryMatch);
 
@@ -29,6 +33,11 @@ async function searchOneEstado(cookie, idEstado, label) {
 
     const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
     const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
+
+    const fueraDeRango = (precioMin != null && (referencePrice == null || referencePrice < precioMin))
+      || (precioMax != null && (referencePrice == null || referencePrice > precioMax));
+    if (fueraDeRango) continue;
+
     const title = campos['Título'] || r.titulo;
     const entity = campos['Entidad'] || '';
     const entityAddress = campos['Dirección de la unidad de compra'] || '';
@@ -48,8 +57,10 @@ async function searchOneEstado(cookie, idEstado, label) {
     };
 
     const row = await upsertOpportunity(op);
-    await markActProcessed(actNumber);
-    if (row) nuevas.push(row);
+    if (row) {
+      await markActProcessed(actNumber);
+      nuevas.push(row);
+    }
   }
 
   return {
@@ -74,4 +85,15 @@ async function searchOpenByCategory() {
   return { abiertas, programadas };
 }
 
-module.exports = { searchOpenByCategory };
+// Misma búsqueda por rubro, pero solo entre $10,000 y $50,000 de precio de
+// referencia — el rango que cubre "Cotización en línea" para procesos por
+// encima de "Compra menor" (confirmado con el campo "Proceso posterior" del
+// pliego de un acto real).
+async function searchByPriceRange(precioMin = 10000, precioMax = 50000) {
+  const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
+  const abiertas = await searchOneEstado(cookie, pc.ESTADO.ABIERTA, 'Abiertas', { precioMin, precioMax });
+  const programadas = await searchOneEstado(cookie, pc.ESTADO.PROGRAMADA, 'Programadas', { precioMin, precioMax });
+  return { abiertas, programadas };
+}
+
+module.exports = { searchOpenByCategory, searchByPriceRange };
