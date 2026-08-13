@@ -184,7 +184,10 @@ app.get('/api/opportunities/:id/quote', async (req, res) => {
 
 function computeTotals(items) {
   const subtotal = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0);
-  const itbm = subtotal * 0.07;
+  // Redondeado a centavos igual que en el Excel (generateQuoteExcel.js) —
+  // si no, el ITBM/total que se guarda y sale en el PDF puede diferir en
+  // un centavo del que el usuario ve en el Excel.
+  const itbm = Math.round(subtotal * 0.07 * 100) / 100;
   return { subtotal, itbm, total: subtotal + itbm };
 }
 

@@ -118,9 +118,16 @@ async function generateQuoteExcel({ opportunity, quote }) {
       errorTitle: 'Valor no válido',
       error: 'Elige un porcentaje de la lista (1.0 a 1.5).',
     };
-    row.getCell(9).value = { formula: `PRODUCT(F${r},H${r})`, result: 0 };
+    // Redondeado a centavos aquí mismo: sin esto, "Precio Un." se ve en
+    // pantalla como 116.81 pero por dentro guarda más decimales (ej.
+    // 116.8133...), y al multiplicar por la cantidad el Subtotal no
+    // coincide con lo que da la calculadora de PanamaCompra (que sí usa el
+    // precio ya redondeado a 2 decimales que el proveedor escribe). Con el
+    // redondeo aquí, todo lo que depende de esta celda (Subtotal, ITBM,
+    // Suma) queda consistente con el precio que realmente se ve y se sube.
+    row.getCell(9).value = { formula: `ROUND(PRODUCT(F${r},H${r}),2)`, result: 0 };
     row.getCell(10).value = { formula: `PRODUCT(I${r},D${r})`, result: 0 };
-    row.getCell(11).value = { formula: `PRODUCT(J${r},0.07)`, result: 0 };
+    row.getCell(11).value = { formula: `ROUND(PRODUCT(J${r},0.07),2)`, result: 0 };
     row.getCell(12).value = { formula: `SUM(J${r},K${r})`, result: 0 };
     row.getCell(13).value = item.precioReferencia != null ? item.precioReferencia : null; // dato informativo de PanamaCompra, no se edita
     row.getCell(13).font = { italic: true, size: 8.5, color: { argb: 'FF565873' } };
@@ -148,7 +155,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
 
   r += 1;
   totalLine(sheet, r, 'SUBTOTAL', `SUM(J${firstItemRow}:J${lastItemRow})`); const subtotalRow = r; r++;
-  totalLine(sheet, r, 'ITBM (7%)', `J${subtotalRow}*0.07`); const itbmRow = r; r++;
+  totalLine(sheet, r, 'ITBM (7%)', `ROUND(J${subtotalRow}*0.07,2)`); const itbmRow = r; r++;
   totalLine(sheet, r, 'TOTAL COTIZACIÓN', `J${subtotalRow}+J${itbmRow}`, true); const totalRow = r; r++;
 
   // ===== Verificación contra el precio de referencia de PanamaCompra =====
