@@ -183,12 +183,16 @@ app.get('/api/opportunities/:id/quote', async (req, res) => {
 });
 
 function computeTotals(items) {
-  const subtotal = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0);
-  // Redondeado a centavos igual que en el Excel (generateQuoteExcel.js) —
-  // si no, el ITBM/total que se guarda y sale en el PDF puede diferir en
-  // un centavo del que el usuario ve en el Excel.
+  const rawSubtotal = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0);
+  // Redondeado a centavos en cada paso (igual que en el Excel,
+  // generateQuoteExcel.js) — si no, además del desfase de 1 centavo contra
+  // PanamaCompra, sumar varios renglones/ITBM en punto flotante deja
+  // residuos binarios (ej. 374.96000000000004) que se ven bien en pantalla
+  // por el formato, pero quedan guardados sucios en la base de datos.
+  const subtotal = Math.round(rawSubtotal * 100) / 100;
   const itbm = Math.round(subtotal * 0.07 * 100) / 100;
-  return { subtotal, itbm, total: subtotal + itbm };
+  const total = Math.round((subtotal + itbm) * 100) / 100;
+  return { subtotal, itbm, total };
 }
 
 async function saveDraft(oppId, data) {
