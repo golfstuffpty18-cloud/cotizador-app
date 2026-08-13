@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finanzas | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<style>
+  :root{
+    --blue:#1616e6; --navy:#0a0a1a;
+    --green:#1fa971; --red:#c0392b;
+    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--gray-50); color:#10101f; }
+  header{ background:var(--navy); color:#fff; padding:16px 20px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
+  header h1{ font-size:.95rem; margin:0; font-weight:700; }
+
+  main{ padding:16px; max-width:720px; margin:0 auto 80px; }
+  section{ background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 10px 24px -16px rgba(10,10,26,.2); }
+  h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:0 0 14px; }
+
+  label{ display:block; font-size:.76rem; font-weight:600; color:var(--navy); margin-bottom:4px; }
+  input, select, textarea{
+    width:100%; padding:9px 11px; border-radius:8px; border:2px solid var(--gray-100);
+    font-size:.85rem; font-family:inherit; margin-bottom:10px; background:#fff;
+  }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--blue); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+  .btn{ padding:11px 16px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.85rem; cursor:pointer; }
+  .btn-primary{ background:var(--blue); color:#fff; width:100%; }
+  .btn-ghost{ background:#fff; border-color:var(--gray-100); color:var(--navy); }
+  .btn-danger{ background:#fbe9e7; color:var(--red); border:none; font-size:.75rem; padding:6px 12px; }
+  .btn-row{ display:flex; gap:10px; }
+  .btn-row .btn{ flex:1; }
+
+  .tipo-toggle{ display:flex; gap:10px; margin-bottom:14px; }
+  .tipo-toggle label{
+    flex:1; margin:0; text-align:center; padding:10px; border-radius:10px; border:2px solid var(--gray-100);
+    font-weight:700; font-size:.82rem; color:var(--gray-600); cursor:pointer;
+  }
+  .tipo-toggle input{ display:none; }
+  .tipo-toggle input:checked + span{ color:inherit; }
+  .tipo-toggle label.active-gasto{ border-color:var(--red); color:var(--red); background:#fbe9e7; }
+  .tipo-toggle label.active-emitida{ border-color:var(--green); color:var(--green); background:#e6f7ef; }
+
+  .file-drop{
+    display:block; text-align:center; padding:22px 12px; border-radius:12px;
+    border:2px dashed var(--gray-100); color:var(--gray-600); font-size:.82rem; cursor:pointer; margin-bottom:10px;
+  }
+  .file-drop input{ display:none; }
+
+  .review-form{ display:none; }
+  .review-form.show{ display:block; }
+  .aviso-baja{ background:#fff6e0; color:#a97400; font-size:.76rem; padding:8px 10px; border-radius:8px; margin-bottom:10px; }
+
+  .filters{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+  .filters select{ margin-bottom:0; }
+
+  .resumen-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+  .resumen-box{ background:var(--gray-50); border-radius:10px; padding:10px; text-align:center; }
+  .resumen-box .label{ font-size:.68rem; color:var(--gray-600); text-transform:uppercase; font-weight:700; }
+  .resumen-box .valor{ font-size:1.05rem; font-weight:700; margin-top:2px; }
+  .resumen-box.emitido .valor{ color:var(--green); }
+  .resumen-box.gastos .valor{ color:var(--red); }
+  .resumen-box.ganancia .valor{ color:var(--blue); }
+
+  .proyectos-toggle{ font-size:.78rem; color:var(--blue); font-weight:700; cursor:pointer; text-align:center; margin-top:4px; }
+  #proyectosTabla{ display:none; margin-top:10px; }
+  #proyectosTabla.show{ display:block; }
+  .proyecto-row{ display:flex; justify-content:space-between; font-size:.8rem; padding:6px 0; border-bottom:1px solid var(--gray-50); }
+  .proyecto-row .nombre{ font-weight:700; color:var(--navy); }
+  .proyecto-row .cifras{ color:var(--gray-600); text-align:right; }
+
+  .mes-header{ font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:18px 0 8px; }
+  .mes-header:first-child{ margin-top:0; }
+
+  .factura-item{ border:2px solid var(--gray-100); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .factura-item .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .factura-item .contraparte{ font-weight:700; font-size:.86rem; color:var(--navy); }
+  .factura-item .total{ font-weight:700; font-size:.9rem; white-space:nowrap; }
+  .factura-item.gasto .total{ color:var(--red); }
+  .factura-item.emitida .total{ color:var(--green); }
+  .factura-item .meta{ font-size:.76rem; color:var(--gray-600); margin:4px 0 8px; }
+  .factura-item .proyecto-tag{ display:inline-block; background:var(--gray-50); color:var(--gray-600); font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:999px; margin-right:6px; }
+  .factura-item .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:6px; }
+  .factura-item .actions a, .factura-item .actions button{ font-size:.74rem; padding:5px 10px; border-radius:999px; border:2px solid var(--gray-100); background:#fff; color:var(--navy); text-decoration:none; cursor:pointer; }
+
+  .empty{ text-align:center; color:var(--gray-400); padding:30px 10px; font-size:.85rem; }
+  .spinner{ text-align:center; color:var(--gray-600); font-size:.82rem; padding:16px; }
+  .error-msg{ background:#fbe9e7; color:var(--red); font-size:.8rem; padding:8px 10px; border-radius:8px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">←</a>
+  <h1>Finanzas</h1>
+</header>
+
+<main>
+  <section id="resumenSection">
+    <h2>Resumen del año</h2>
+    <div id="resumenBody">Cargando…</div>
+  </section>
+
+  <section>
+    <h2>Nueva factura</h2>
+    <div class="tipo-toggle">
+      <label id="labelGasto"><input type="radio" name="tipoNueva" value="gasto" checked><span>💸 Gasto / Compra</span></label>
+      <label id="labelEmitida"><input type="radio" name="tipoNueva" value="emitida"><span>🧾 Emitida a cliente</span></label>
+    </div>
+
+    <label class="file-drop" id="fileDrop">
+      📷 Toca para tomar foto o elegir archivo (JPG, PNG o PDF)
+      <input type="file" id="fileInput" accept="image/*,application/pdf" capture="environment">
+    </label>
+
+    <div id="extraccionEstado"></div>
+
+    <form id="reviewForm" class="review-form">
+      <label>Proveedor / Cliente</label>
+      <input type="text" id="fContraparte" required>
+
+      <div class="row2">
+        <div><label>RUC</label><input type="text" id="fRuc"></div>
+        <div><label># Factura</label><input type="text" id="fNumero"></div>
+      </div>
+
+      <div class="row2">
+        <div><label>Fecha</label><input type="date" id="fFecha"></div>
+        <div>
+          <label>Proyecto (opcional)</label>
+          <input type="text" id="fProyecto" list="proyectosList" placeholder="Ej: Banco General - CCTV">
+          <datalist id="proyectosList"></datalist>
+        </div>
+      </div>
+
+      <div class="row3">
+        <div><label>Subtotal</label><input type="number" step="0.01" id="fSubtotal"></div>
+        <div><label>ITBM</label><input type="number" step="0.01" id="fItbm"></div>
+        <div><label>Total</label><input type="number" step="0.01" id="fTotal" required></div>
+      </div>
+
+      <label>Notas (opcional)</label>
+      <textarea id="fNotas" rows="2"></textarea>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost" id="cancelarBtn">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="guardarBtn">Guardar factura</button>
+      </div>
+    </form>
+  </section>
+
+  <section>
+    <h2>Facturas guardadas</h2>
+    <div class="filters">
+      <select id="filtroTipo">
+        <option value="">Todas</option>
+        <option value="gasto">Gastos</option>
+        <option value="emitida">Emitidas</option>
+      </select>
+      <select id="filtroAnio"></select>
+      <select id="filtroProyecto"><option value="">Todos los proyectos</option></select>
+    </div>
+    <div id="listaFacturas">Cargando…</div>
+  </section>
+</main>
+
+<script src="/finanzas.js"></script>
+</body>
+</html>

@@ -19,12 +19,16 @@ const { searchOpenByCategory, searchCompraMenor } = require('../shared/searchPan
 const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
+const { extractInvoiceData } = require('../shared/claudeInvoice');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ACCESS_CODE = process.env.APP_ACCESS_CODE || '';
 const COOKIE_NAME = 'cotizador_auth';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// Fotos de factura tomadas con la cámara del celular pesan bastante más que
+// un Excel — límite aparte para no tener que subir el de las demás rutas.
+const uploadFactura = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 app.use(express.json());
 app.use(cookieParser());
@@ -435,6 +439,159 @@ app.put('/api/catalog/:id', async (req, res) => {
 
 app.delete('/api/catalog/:id', async (req, res) => {
   await pool.query('DELETE FROM catalog_items WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// ---- Finanzas: facturas de gasto (compras/proveedores) y emitidas (a clientes) ----
+
+// Solo extrae y devuelve la propuesta — no guarda nada todavía. El archivo
+// vuelve al cliente en base64 para que lo reenvíe tal cual en el POST de
+// confirmación; así no hace falta guardar estado temporal en el servidor
+// entre "extraer" y "guardar".
+app.post('/api/finanzas/extraer', uploadFactura.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'no se recibió ningún archivo' });
+  let extraido;
+  try {
+    extraido = await extractInvoiceData(req.file.buffer, req.file.mimetype);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  res.json({
+    extraido,
+    archivo_nombre: req.file.originalname,
+    archivo_tipo: req.file.mimetype,
+    archivo_base64: req.file.buffer.toString('base64'),
+  });
+});
+
+app.get('/api/finanzas', async (req, res) => {
+  const { tipo, anio, mes, proyecto } = req.query;
+  const clauses = [];
+  const params = [];
+  if (tipo) { params.push(tipo); clauses.push(`tipo = $${params.length}`); }
+  if (proyecto) { params.push(proyecto); clauses.push(`proyecto = $${params.length}`); }
+  if (anio) { params.push(anio); clauses.push(`EXTRACT(YEAR FROM fecha) = $${params.length}`); }
+  if (mes) { params.push(mes); clauses.push(`EXTRACT(MONTH FROM fecha) = $${params.length}`); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const { rows } = await pool.query(
+    `SELECT id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at
+     FROM finance_invoices ${where} ORDER BY fecha DESC NULLS LAST, created_at DESC LIMIT 500`,
+    params
+  );
+  res.json(rows);
+});
+
+app.get('/api/finanzas/proyectos', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT proyecto FROM finance_invoices WHERE proyecto IS NOT NULL AND proyecto != '' ORDER BY proyecto`
+  );
+  res.json(rows.map((r) => r.proyecto));
+});
+
+// Ganancia = total emitido - total de gastos, tanto del año consultado como
+// desglosado por proyecto (a partir del texto libre que el usuario escribe
+// al guardar cada factura — ver nota en finanzas.html sobre por qué no es
+// una FK a opportunities).
+app.get('/api/finanzas/resumen', async (req, res) => {
+  const anio = req.query.anio || new Date().getFullYear();
+  const { rows: porAnio } = await pool.query(
+    `SELECT tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices WHERE EXTRACT(YEAR FROM fecha) = $1 GROUP BY tipo`,
+    [anio]
+  );
+  const { rows: porProyecto } = await pool.query(
+    `SELECT proyecto, tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices
+     WHERE proyecto IS NOT NULL AND proyecto != '' GROUP BY proyecto, tipo ORDER BY proyecto`
+  );
+
+  const totales = { emitida: 0, gasto: 0 };
+  for (const r of porAnio) totales[r.tipo] = Number(r.total);
+
+  const proyectos = {};
+  for (const r of porProyecto) {
+    if (!proyectos[r.proyecto]) proyectos[r.proyecto] = { proyecto: r.proyecto, emitida: 0, gasto: 0 };
+    proyectos[r.proyecto][r.tipo] = Number(r.total);
+  }
+  const por_proyecto = Object.values(proyectos).map((p) => ({ ...p, ganancia: p.emitida - p.gasto }));
+
+  res.json({
+    anio: Number(anio),
+    total_emitido: totales.emitida,
+    total_gastos: totales.gasto,
+    ganancia: totales.emitida - totales.gasto,
+    por_proyecto,
+  });
+});
+
+app.get('/api/finanzas/:id', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, created_at
+     FROM finance_invoices WHERE id = $1`,
+    [req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
+app.get('/api/finanzas/:id/archivo', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT archivo, archivo_tipo, archivo_nombre FROM finance_invoices WHERE id = $1`,
+    [req.params.id]
+  );
+  if (!rows.length || !rows[0].archivo) return res.status(404).send('no encontrado');
+  res.set('Content-Type', rows[0].archivo_tipo || 'application/octet-stream');
+  res.set('Content-Disposition', `inline; filename="${String(rows[0].archivo_nombre || 'archivo').replace(/"/g, '')}"`);
+  res.send(rows[0].archivo);
+});
+
+app.post('/api/finanzas', async (req, res) => {
+  const {
+    tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total,
+    proyecto, items, notas, archivo_nombre, archivo_tipo, archivo_base64, datos_extraidos,
+  } = req.body || {};
+  if (!tipo || !['gasto', 'emitida'].includes(tipo)) return res.status(400).json({ error: 'tipo debe ser "gasto" o "emitida"' });
+  if (total == null || total === '') return res.status(400).json({ error: 'falta el total' });
+
+  const archivoBuffer = archivo_base64 ? Buffer.from(archivo_base64, 'base64') : null;
+
+  const { rows } = await pool.query(
+    `INSERT INTO finance_invoices
+       (tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, archivo, datos_extraidos)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+     RETURNING id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
+    [
+      tipo, contraparte || null, ruc || null, numero_factura || null, fecha || null,
+      subtotal || null, itbm || null, total, proyecto || null,
+      items ? JSON.stringify(items) : null, notas || null,
+      archivo_nombre || null, archivo_tipo || null, archivoBuffer,
+      datos_extraidos ? JSON.stringify(datos_extraidos) : null,
+    ]
+  );
+
+  if (archivoBuffer) {
+    const subfolder = `Finanzas/${tipo === 'gasto' ? 'Gastos' : 'Emitidas'}`;
+    uploadToDropboxSafe(archivo_nombre || `factura-${rows[0].id}`, archivoBuffer, subfolder);
+  }
+
+  res.json(rows[0]);
+});
+
+app.put('/api/finanzas/:id', async (req, res) => {
+  const { tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE finance_invoices SET
+       tipo = COALESCE($1, tipo), contraparte = $2, ruc = $3, numero_factura = $4, fecha = $5,
+       subtotal = $6, itbm = $7, total = COALESCE($8, total), proyecto = $9, notas = $10, updated_at = now()
+     WHERE id = $11
+     RETURNING id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
+    [tipo || null, contraparte || null, ruc || null, numero_factura || null, fecha || null,
+      subtotal || null, itbm || null, total, proyecto || null, notas || null, req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
+app.delete('/api/finanzas/:id', async (req, res) => {
+  await pool.query('DELETE FROM finance_invoices WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 });
 

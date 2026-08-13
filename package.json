@@ -9,6 +9,7 @@
     "gen-vapid": "node scripts/gen-vapid.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "cookie-parser": "^1.4.6",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",

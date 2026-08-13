@@ -101,6 +101,30 @@ CREATE TABLE IF NOT EXISTS catalog_items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS finance_invoices (
+  id SERIAL PRIMARY KEY,
+  tipo TEXT NOT NULL CHECK (tipo IN ('gasto','emitida')),
+  contraparte TEXT,
+  ruc TEXT,
+  numero_factura TEXT,
+  fecha DATE,
+  subtotal NUMERIC,
+  itbm NUMERIC,
+  total NUMERIC,
+  proyecto TEXT,
+  items JSONB,
+  notas TEXT,
+  archivo_nombre TEXT,
+  archivo_tipo TEXT,
+  archivo BYTEA,
+  datos_extraidos JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_finance_invoices_fecha ON finance_invoices(fecha);
+CREATE INDEX IF NOT EXISTS idx_finance_invoices_tipo ON finance_invoices(tipo);
+CREATE INDEX IF NOT EXISTS idx_finance_invoices_proyecto ON finance_invoices(proyecto);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;

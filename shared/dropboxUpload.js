@@ -68,8 +68,15 @@ function asciiSafeJson(obj) {
 async function uploadToDropboxSafe(filename, buffer, subfolder) {
   try {
     const accessToken = await getAccessToken();
-    const dropboxPath = subfolder
-      ? `${FOLDER}/${sanitizeFilename(subfolder)}/${sanitizeFilename(filename)}`
+    // subfolder puede traer varios niveles separados por "/" (ej.
+    // "Finanzas/Gastos") — se sanitiza cada segmento por separado para no
+    // perder la jerarquía de carpetas (sanitizeFilename por sí sola borra
+    // las "/" y los aplastaría en un solo nombre de carpeta).
+    const subfolderPath = subfolder
+      ? subfolder.split('/').filter(Boolean).map(sanitizeFilename).join('/')
+      : '';
+    const dropboxPath = subfolderPath
+      ? `${FOLDER}/${subfolderPath}/${sanitizeFilename(filename)}`
       : `${FOLDER}/${sanitizeFilename(filename)}`;
     const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
