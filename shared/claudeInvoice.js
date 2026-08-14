@@ -94,7 +94,11 @@ async function extractInvoiceData(buffer, mimetype) {
   const response = await getClient().messages.create({
     model: 'claude-opus-5',
     max_tokens: 4096,
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+    // effort 'medium' (no 'low'): distinguir el bloque del emisor del bloque
+    // del cliente en el layout de una factura requiere algo de razonamiento
+    // — con 'low' el nombre (contraparte) salía mal aunque dirección/
+    // teléfono/correo del mismo bloque sí salían bien.
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{
       role: 'user',
       content: [
@@ -102,7 +106,8 @@ async function extractInvoiceData(buffer, mimetype) {
         {
           type: 'text',
           text: `Esta imagen o documento es una factura de una empresa panameña propia (${EMPRESA_PROPIA}). Puede ser (a) una factura de COMPRA/GASTO que un proveedor le emitió a la empresa propia, o (b) una factura que la empresa propia EMITIÓ a uno de sus clientes.\n\n` +
-            `IMPORTANTE: en ambos casos, todos los datos que extraigas (contraparte, ruc, dirección, teléfono, correo) deben ser de la OTRA empresa/persona en la transacción — NUNCA de la empresa propia (${EMPRESA_PROPIA}), bajo ninguno de sus nombres. Si es una factura emitida a un cliente, los datos de la empresa propia suelen aparecer arriba, en el encabezado o logo del documento — ignóralos; busca en cambio la sección donde se identifica a quien RECIBE la factura (normalmente etiquetada "Cliente:", "Facturado a:", "Señor(es):", "Razón Social:" o similar) y extrae esos datos de ahí.\n\n` +
+            `IMPORTANTE: en ambos casos, todos los datos que extraigas (contraparte, ruc, dirección, teléfono, correo) deben ser de la OTRA empresa/persona en la transacción — NUNCA de la empresa propia (${EMPRESA_PROPIA}), bajo ninguno de sus nombres. Si es una factura emitida a un cliente, los datos de la empresa propia suelen aparecer arriba, en el encabezado o logo del documento — ignóralos; busca en cambio la sección donde se identifica a quien RECIBE la factura (normalmente etiquetada "Cliente:", "Facturado a:", "Señor(es):", "Razón Social:" o similar).\n\n` +
+            'PRIMERO localiza ese bloque de texto del cliente/proveedor (normalmente trae junto el nombre, RUC, dirección y a veces teléfono/correo). LUEGO extrae los cinco campos (contraparte, ruc, direccion, telefono, correo) del MISMO bloque — nunca mezcles el nombre de una parte del documento con los datos de contacto de otra parte. Si el nombre que ibas a poner en "contraparte" no es exactamente la misma entidad de la que sacaste "direccion"/"telefono"/"correo", revísalo: es una señal de que tomaste el nombre del lugar equivocado.\n\n' +
             'Extrae los datos exactamente como aparecen en el documento, sin inventar ni redondear. Si un dato no aparece o no se puede leer con certeza, usa null en vez de adivinar. La fecha debe ir en formato YYYY-MM-DD.',
         },
       ],
