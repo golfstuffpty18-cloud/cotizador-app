@@ -54,6 +54,7 @@
     border:2px dashed var(--gray-100); color:var(--gray-600); font-size:.82rem; cursor:pointer; margin-bottom:10px;
   }
   .file-drop input{ display:none; }
+  .manual-link{ text-align:center; font-size:.78rem; color:var(--blue); font-weight:700; cursor:pointer; margin-bottom:14px; }
 
   .review-form{ display:none; }
   .review-form.show{ display:block; }
@@ -119,11 +120,12 @@
       📷 Toca para tomar foto o elegir archivo (JPG, PNG o PDF)
       <input type="file" id="fileInput" accept="image/*,application/pdf" capture="environment">
     </label>
+    <div class="manual-link" id="manualBtn">✏️ Agregar gasto sin factura (manual)</div>
 
     <div id="extraccionEstado"></div>
 
     <form id="reviewForm" class="review-form">
-      <label>Proveedor / Cliente</label>
+      <label>Proveedor / Cliente / Concepto</label>
       <input type="text" id="fContraparte" required>
 
       <div class="row2">

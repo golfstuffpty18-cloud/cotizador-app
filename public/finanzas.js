@@ -79,6 +79,20 @@ $('fileInput').addEventListener('change', async () => {
   fillForm(data.extraido);
 });
 
+// Gastos sin factura (propina, pago informal, algo que nunca dio recibo...)
+// que igual hay que dejar registrado para la declaración de renta a fin de
+// año — mismo formulario, pero sin pasar por la extracción de Claude Vision.
+$('manualBtn').addEventListener('click', () => {
+  document.querySelector('input[name="tipoNueva"][value="gasto"]').checked = true;
+  updateTipoToggleClasses();
+  pending = null;
+  editingId = null;
+  $('fileInput').value = '';
+  $('extraccionEstado').innerHTML = '<div class="aviso-baja">✏️ Gasto manual sin factura — llena los datos y guarda.</div>';
+  fillForm({});
+  $('reviewForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 $('cancelarBtn').addEventListener('click', resetForm);
 
 $('reviewForm').addEventListener('submit', async (e) => {
