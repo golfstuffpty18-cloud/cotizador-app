@@ -641,13 +641,18 @@ app.all('/api/cron/backfill-cliente-info', async (req, res) => {
   for (const row of rows) {
     try {
       const extraido = await extractInvoiceData(row.archivo, row.archivo_tipo);
+      // contraparte solo se pisa en force, y directo (no COALESCE): si
+      // extractInvoiceData la anuló por detectar que era la empresa propia
+      // (ver limpiarContraparteSiEsEmpresaPropia en claudeInvoice.js), eso
+      // es justo lo que hay que grabar — limpia el dato equivocado que había
+      // quedado guardado con el prompt anterior, en vez de conservarlo.
       await pool.query(
         force
-          ? `UPDATE finance_invoices SET direccion = $1, telefono = $2, correo = $3 WHERE id = $4`
+          ? `UPDATE finance_invoices SET direccion = $1, telefono = $2, correo = $3, contraparte = $5 WHERE id = $4`
           : `UPDATE finance_invoices SET
                direccion = COALESCE(direccion, $1), telefono = COALESCE(telefono, $2), correo = COALESCE(correo, $3)
              WHERE id = $4`,
-        [extraido.direccion || null, extraido.telefono || null, extraido.correo || null, row.id]
+        [extraido.direccion || null, extraido.telefono || null, extraido.correo || null, row.id, extraido.contraparte || null]
       );
       actualizadas++;
     } catch (err) {

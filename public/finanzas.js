@@ -46,6 +46,7 @@ function resetForm() {
 
 function fillForm(data) {
   $('fContraparte').value = data.contraparte || '';
+  $('fContraparte').classList.remove('needs-review');
   $('fRuc').value = data.ruc || '';
   $('fDireccion').value = data.direccion || '';
   $('fTelefono').value = data.telefono || '';
@@ -94,6 +95,9 @@ async function procesarArchivo(file) {
   if (!data.extraido.fecha) {
     mensaje += '<div class="error-msg">⚠️ No se pudo leer la fecha en la foto — escríbela tú abajo, si no la factura queda como "Sin fecha" y no se va a agrupar en su mes.</div>';
   }
+  if (!data.extraido.contraparte) {
+    mensaje += '<div class="error-msg">⚠️ No se pudo identificar con certeza el proveedor/cliente (para evitar confundirlo con GS Technologies) — escríbelo tú abajo.</div>';
+  }
   $('extraccionEstado').innerHTML = mensaje;
   pending = {
     archivo_nombre: data.archivo_nombre,
@@ -104,6 +108,7 @@ async function procesarArchivo(file) {
   editingId = null;
   fillForm(data.extraido);
   if (!data.extraido.fecha) $('fFecha').classList.add('needs-review');
+  if (!data.extraido.contraparte) $('fContraparte').classList.add('needs-review');
 }
 
 // Avanza al siguiente archivo de la cola (tras guardar uno, o al saltarlo

@@ -74,6 +74,21 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+// Salvaguarda determinística: en la práctica, el modelo a veces devuelve el
+// nombre de la empresa propia como "contraparte" a pesar de las
+// instrucciones del prompt (el nombre del encabezado "gana" incluso cuando
+// dirección/teléfono/correo sí se leen bien del bloque del cliente). En vez
+// de confiar solo en el prompt, se anula el campo si coincide — mejor
+// dejarlo vacío y pedirle al usuario que lo escriba que guardar un dato
+// claramente equivocado.
+const NOMBRE_PROPIO_RE = /gs\s*technologies/i;
+function limpiarContraparteSiEsEmpresaPropia(data) {
+  if (data && typeof data.contraparte === 'string' && NOMBRE_PROPIO_RE.test(data.contraparte)) {
+    data.contraparte = null;
+  }
+  return data;
+}
+
 function buildContentBlock(buffer, mimetype) {
   const data = buffer.toString('base64');
   if (mimetype === 'application/pdf') {
@@ -124,7 +139,7 @@ async function extractInvoiceData(buffer, mimetype) {
   }
 
   try {
-    return JSON.parse(textBlock.text);
+    return limpiarContraparteSiEsEmpresaPropia(JSON.parse(textBlock.text));
   } catch (err) {
     throw new Error('La extracción no devolvió un formato válido. Ingresa los datos manualmente.');
   }
