@@ -73,18 +73,34 @@ async function parseQuoteExcel(buffer) {
 
     const costoDistribuidor = cellValueNumber(row.getCell(5));
     const margenG = cellValueNumber(row.getCell(8));
-    // "Precio Un." (columna I) es una fórmula (ROUND(PRODUCT(F,H),2), es
-    // decir costoDistribuidor*1.07*margenG redondeado a centavos) — no se
-    // lee su resultado cacheado porque si el programa con el que se editó
-    // el Excel no recalculó las fórmulas antes de guardar (cálculo manual,
-    // o algún visor/editor que no ejecuta fórmulas), esa celda se queda en
-    // 0 aunque el usuario sí haya llenado el costo y el %G, y la cotización
-    // sale sin precios. Se recalcula siempre desde los dos únicos valores
-    // que el usuario realmente escribe, replicando la misma fórmula de
+    // "Precio Un." (columna I) normalmente es una fórmula
+    // (ROUND(PRODUCT(F,H),2), es decir costoDistribuidor*1.07*margenG
+    // redondeado a centavos) — cuando hay costo y margen, no se lee su
+    // resultado cacheado porque si el programa con el que se editó el Excel
+    // no recalculó las fórmulas antes de guardar (cálculo manual, o algún
+    // visor/editor que no ejecuta fórmulas), esa celda se queda en 0 aunque
+    // el usuario sí haya llenado el costo y el %G. Se recalcula desde los
+    // dos valores que el usuario escribe, replicando la misma fórmula de
     // generateQuoteExcel.js — incluido el redondeo a 2 decimales, si no el
     // Subtotal (cantidad × este precio) no coincide con lo que calcula la
     // calculadora de PanamaCompra a partir del precio ya redondeado.
-    const precioUnitario = Math.round(costoDistribuidor * 1.07 * margenG * 100) / 100;
+    //
+    // Pero si el usuario deja costo/margen vacíos y en vez de eso escribe el
+    // precio directo en "Precio Un.", ese caso hay que respetarlo — antes se
+    // perdía y la cotización salía con renglones en 0.00. La diferencia con
+    // el caso de arriba es que aquí la celda NO es una fórmula (es un número
+    // plano que el usuario tecleó), así que sí se puede confiar en su valor
+    // tal cual está guardado, sin el riesgo de fórmula-no-recalculada.
+    const precioCell = row.getCell(9);
+    const precioEsFormula = precioCell && precioCell.value != null && typeof precioCell.value === 'object';
+    let precioUnitario;
+    if (costoDistribuidor > 0 && margenG > 0) {
+      precioUnitario = Math.round(costoDistribuidor * 1.07 * margenG * 100) / 100;
+    } else if (!precioEsFormula) {
+      precioUnitario = cellValueNumber(precioCell);
+    } else {
+      precioUnitario = 0;
+    }
 
     result.items.push({
       numRenglon: cellValueNumber(row.getCell(1)) || (result.items.length + 1),
