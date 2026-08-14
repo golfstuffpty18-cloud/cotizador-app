@@ -36,7 +36,13 @@ function fillForm(data) {
   $('fContraparte').value = data.contraparte || '';
   $('fRuc').value = data.ruc || '';
   $('fNumero').value = data.numero_factura || '';
-  $('fFecha').value = data.fecha || new Date().toISOString().slice(0, 10);
+  // Ojo: NO se rellena con la fecha de hoy cuando Claude no pudo leerla — si
+  // se rellenara sola con "hoy" el usuario podría no notarlo y guardar una
+  // factura vieja bajo el mes equivocado. Mejor dejarla vacía y avisar (ver
+  // el chequeo en el handler de fileInput más abajo) para que quede claro
+  // que hay que ponerla a mano.
+  $('fFecha').value = data.fecha || '';
+  $('fFecha').classList.remove('needs-review');
   $('fSubtotal').value = data.subtotal != null ? data.subtotal : '';
   $('fItbm').value = data.itbm != null ? data.itbm : '';
   $('fTotal').value = data.total != null ? data.total : '';
@@ -68,7 +74,11 @@ $('fileInput').addEventListener('change', async () => {
     return;
   }
 
-  $('extraccionEstado').innerHTML = '<div class="aviso-baja">✅ Datos extraídos — revisa y corrige antes de guardar.</div>';
+  let mensaje = '<div class="aviso-baja">✅ Datos extraídos — revisa y corrige antes de guardar.</div>';
+  if (!data.extraido.fecha) {
+    mensaje += '<div class="error-msg">⚠️ No se pudo leer la fecha en la foto — escríbela tú abajo, si no la factura queda como "Sin fecha" y no se va a agrupar en su mes.</div>';
+  }
+  $('extraccionEstado').innerHTML = mensaje;
   pending = {
     archivo_nombre: data.archivo_nombre,
     archivo_tipo: data.archivo_tipo,
@@ -77,6 +87,7 @@ $('fileInput').addEventListener('change', async () => {
   };
   editingId = null;
   fillForm(data.extraido);
+  if (!data.extraido.fecha) $('fFecha').classList.add('needs-review');
 });
 
 // Gastos sin factura (propina, pago informal, algo que nunca dio recibo...)
@@ -90,6 +101,7 @@ $('manualBtn').addEventListener('click', () => {
   $('fileInput').value = '';
   $('extraccionEstado').innerHTML = '<div class="aviso-baja">✏️ Gasto manual sin factura — llena los datos y guarda.</div>';
   fillForm({});
+  $('fFecha').value = new Date().toISOString().slice(0, 10); // conveniencia: un gasto manual normalmente se registra el mismo día
   $('reviewForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
