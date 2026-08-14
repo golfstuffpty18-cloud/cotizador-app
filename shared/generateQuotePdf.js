@@ -156,14 +156,20 @@ function generateQuotePdf({ quote, opportunity }) {
     }
 
     // ===== Signature =====
-    y = Math.max(y, doc.page.height - 150);
-    const firmaH = 52;
-    const lineaFirmaY = y + firmaH + 2;
+    y = Math.max(y, doc.page.height - 160);
+    const firmaH = 64;
+    // La línea corta la firma cerca de la parte baja del trazo (62% de su
+    // alto), no debajo de todo — así los rasgos largos (los que bajan del
+    // nombre cursivo) cruzan la línea como pasa al firmar de verdad en papel,
+    // en vez de quedar flotando completa arriba de la línea.
+    const lineaFirmaY = y + Math.round(firmaH * 0.62);
+    doc.moveTo(marginX, lineaFirmaY).lineTo(marginX + 220, lineaFirmaY).strokeColor('#cccccc').stroke();
+    // La firma se dibuja DESPUÉS de la línea para que la tinta quede encima
+    // (tape la línea donde el trazo la cruza), no la línea encima de la tinta.
     if (fs.existsSync(FIRMA_PATH)) {
       try { doc.image(FIRMA_PATH, marginX + 6, y, { height: firmaH }); } catch (e) {}
     }
-    doc.moveTo(marginX, lineaFirmaY).lineTo(marginX + 220, lineaFirmaY).strokeColor('#cccccc').stroke();
-    y = lineaFirmaY + 6;
+    y = y + firmaH + 6;
     doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('Ing. Dionisio Sánchez', marginX, y);
     doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('Representante Legal', marginX, y + 12);
 
