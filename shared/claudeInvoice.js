@@ -28,15 +28,15 @@ const SCHEMA = {
   properties: {
     contraparte: {
       type: 'string',
-      description: 'Nombre del proveedor (si es una factura de compra/gasto) o del cliente (si es una factura emitida a un cliente).',
+      description: 'Nombre de la OTRA empresa/persona en la transacción — NUNCA "GS Technologies and Security Solutions" (la dueña de esta cuenta). Si es una factura de compra/gasto: el proveedor que la emite. Si es una factura que GS Technologies emitió a un cliente: el cliente que la recibe (sección "Cliente:", "Facturado a:", "Señor(es):", "Razón Social:" o similar — no el encabezado/logo de arriba, que es de GS Technologies).',
     },
-    ruc: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    ruc: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'RUC de esa misma contraparte, nunca el de GS Technologies.' },
     direccion: {
       anyOf: [{ type: 'string' }, { type: 'null' }],
-      description: 'Dirección del proveedor/cliente (la contraparte), si aparece impresa en la factura.',
+      description: 'Dirección de esa misma contraparte, nunca de GS Technologies. Si aparece impresa en la factura.',
     },
-    telefono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    correo: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    telefono: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'Teléfono de esa misma contraparte, nunca de GS Technologies.' },
+    correo: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'Correo de esa misma contraparte, nunca de GS Technologies.' },
     numero_factura: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     fecha: {
       anyOf: [{ type: 'string', description: 'Fecha de la factura en formato YYYY-MM-DD' }, { type: 'null' }],
@@ -94,7 +94,9 @@ async function extractInvoiceData(buffer, mimetype) {
         contentBlock,
         {
           type: 'text',
-          text: 'Esta imagen o documento es una factura de una empresa panameña (puede ser una factura de compra/gasto recibida de un proveedor, o una factura emitida a un cliente). Extrae los datos exactamente como aparecen en el documento, sin inventar ni redondear, incluyendo la dirección, teléfono y correo electrónico del proveedor/cliente si aparecen impresos en la factura. Si un dato no aparece o no se puede leer con certeza, usa null en vez de adivinar. La fecha debe ir en formato YYYY-MM-DD.',
+          text: 'Esta imagen o documento es una factura de GS Technologies and Security Solutions, una empresa panameña. Puede ser (a) una factura de COMPRA/GASTO que un proveedor le emitió a GS Technologies, o (b) una factura que GS Technologies EMITIÓ a uno de sus clientes.\n\n' +
+            'IMPORTANTE: en ambos casos, todos los datos que extraigas (contraparte, ruc, dirección, teléfono, correo) deben ser de la OTRA empresa/persona en la transacción — NUNCA de GS Technologies and Security Solutions. Si es una factura emitida a un cliente, los datos de GS Technologies suelen aparecer arriba, en el encabezado o logo del documento — ignóralos; busca en cambio la sección donde se identifica a quien RECIBE la factura (normalmente etiquetada "Cliente:", "Facturado a:", "Señor(es):", "Razón Social:" o similar) y extrae esos datos de ahí.\n\n' +
+            'Extrae los datos exactamente como aparecen en el documento, sin inventar ni redondear. Si un dato no aparece o no se puede leer con certeza, usa null en vez de adivinar. La fecha debe ir en formato YYYY-MM-DD.',
         },
       ],
     }],

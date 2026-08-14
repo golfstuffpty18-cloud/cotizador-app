@@ -616,20 +616,24 @@ app.delete('/api/finanzas/:id', async (req, res) => {
 
 // Reprocesa con Claude Vision las facturas emitidas que ya se habían subido
 // antes de que existieran los campos dirección/teléfono/correo, para
-// completárselos. Solo llena huecos (COALESCE) — nunca pisa un dato que el
-// usuario ya haya revisado o corregido — así que es seguro correrlo más de
-// una vez (las que ya quedaron completas simplemente no vuelven a salir en
-// el filtro WHERE).
+// completárselos. Por defecto solo llena huecos (COALESCE) — nunca pisa un
+// dato ya guardado — así que es seguro correrlo más de una vez. Con
+// ?force=true SÍ sobreescribe: se usó una sola vez para corregir un lote que
+// había quedado con los datos de GS Technologies en vez de los del cliente
+// (el prompt de extracción no distinguía bien entre emisor y receptor).
 app.all('/api/cron/backfill-cliente-info', async (req, res) => {
   const key = req.query.key || req.headers['x-cron-key'];
   if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'no autorizado' });
   }
+  const force = req.query.force === 'true';
 
   const { rows } = await pool.query(
-    `SELECT id, archivo, archivo_tipo FROM finance_invoices
-     WHERE tipo = 'emitida' AND archivo IS NOT NULL
-       AND (direccion IS NULL OR telefono IS NULL OR correo IS NULL)`
+    force
+      ? `SELECT id, archivo, archivo_tipo FROM finance_invoices WHERE tipo = 'emitida' AND archivo IS NOT NULL`
+      : `SELECT id, archivo, archivo_tipo FROM finance_invoices
+         WHERE tipo = 'emitida' AND archivo IS NOT NULL
+           AND (direccion IS NULL OR telefono IS NULL OR correo IS NULL)`
   );
 
   let actualizadas = 0;
@@ -638,9 +642,11 @@ app.all('/api/cron/backfill-cliente-info', async (req, res) => {
     try {
       const extraido = await extractInvoiceData(row.archivo, row.archivo_tipo);
       await pool.query(
-        `UPDATE finance_invoices SET
-           direccion = COALESCE(direccion, $1), telefono = COALESCE(telefono, $2), correo = COALESCE(correo, $3)
-         WHERE id = $4`,
+        force
+          ? `UPDATE finance_invoices SET direccion = $1, telefono = $2, correo = $3 WHERE id = $4`
+          : `UPDATE finance_invoices SET
+               direccion = COALESCE(direccion, $1), telefono = COALESCE(telefono, $2), correo = COALESCE(correo, $3)
+             WHERE id = $4`,
         [extraido.direccion || null, extraido.telefono || null, extraido.correo || null, row.id]
       );
       actualizadas++;
@@ -649,7 +655,7 @@ app.all('/api/cron/backfill-cliente-info', async (req, res) => {
     }
   }
 
-  res.json({ revisadas: rows.length, actualizadas, errores });
+  res.json({ revisadas: rows.length, actualizadas, errores, force });
 });
 
 // Manejador de errores global: sin esto, un error atrapado por
