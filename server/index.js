@@ -30,7 +30,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // un Excel — límite aparte para no tener que subir el de las demás rutas.
 const uploadFactura = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
-app.use(express.json());
+// Límite por defecto de Express es 100kb — muy chico para el POST de
+// confirmación de /api/finanzas, que manda la foto/PDF de la factura
+// codificada en base64 dentro del JSON (base64 pesa ~33% más que el
+// archivo original; el límite de multer para ese archivo ya es 15MB).
+app.use(express.json({ limit: '25mb' }));
 app.use(cookieParser());
 
 function requireAuth(req, res, next) {
