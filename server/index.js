@@ -203,6 +203,18 @@ function computeTotals(items) {
   return { subtotal, itbm, total };
 }
 
+// Antes esto era solo `opportunity.entity || opportunity.title`, así que
+// cuando una misma institución tenía varias cotizaciones (procesos
+// distintos), todas caían juntas en una sola carpeta de Dropbox. Ahora anida
+// una subcarpeta por proyecto (título + # de acto, igual que ya se usa en el
+// nombre del archivo) dentro de la carpeta de la institución, para que cada
+// proceso quede separado sin perder el agrupamiento por institución.
+function dropboxSubfolderFor(opportunity) {
+  if (opportunity.decision !== 'participar') return undefined;
+  const proyecto = `${opportunity.title} - ${opportunity.act_number}`;
+  return opportunity.entity ? `${opportunity.entity}/${proyecto}` : proyecto;
+}
+
 async function saveDraft(oppId, data) {
   const { cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items } = data;
   const safeItems = Array.isArray(items) ? items : [];
@@ -251,7 +263,7 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
-  const dropboxSubfolder = opportunity.decision === 'participar' ? (opportunity.entity || opportunity.title) : undefined;
+  const dropboxSubfolder = dropboxSubfolderFor(opportunity);
   uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer, dropboxSubfolder); // respaldo best-effort, no bloquea la descarga
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
@@ -301,7 +313,7 @@ app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
   const opportunity = oppRows[0];
 
   const pdfBuffer = await generateQuotePdf({ quote, opportunity });
-  const dropboxSubfolder = opportunity.decision === 'participar' ? (opportunity.entity || opportunity.title) : undefined;
+  const dropboxSubfolder = dropboxSubfolderFor(opportunity);
   uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.pdf`, pdfBuffer, dropboxSubfolder); // respaldo best-effort, no bloquea la aprobación
 
   await pool.query(
