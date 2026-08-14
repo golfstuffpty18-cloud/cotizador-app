@@ -126,11 +126,8 @@ $('reviewForm').addEventListener('submit', async (e) => {
   $('guardarBtn').disabled = true;
   $('guardarBtn').textContent = 'Guardando…';
   try {
-    let res;
     if (editingId) {
-      res = await fetch(`/api/finanzas/${editingId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
+      await guardarFactura(`/api/finanzas/${editingId}`, 'PUT', payload);
     } else {
       Object.assign(payload, {
         archivo_nombre: pending ? pending.archivo_nombre : null,
@@ -138,21 +135,42 @@ $('reviewForm').addEventListener('submit', async (e) => {
         archivo_base64: pending ? pending.archivo_base64 : null,
         datos_extraidos: pending ? pending.datos_extraidos : null,
       });
-      res = await fetch('/api/finanzas', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
+      await guardarFactura('/api/finanzas', 'POST', payload);
     }
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'no se pudo guardar');
     resetForm();
     await Promise.all([loadResumen(), loadFacturas(), loadProyectos()]);
   } catch (err) {
-    alert('Error: ' + err.message);
+    if (err.message !== 'CANCELADO_POR_USUARIO') alert('Error: ' + err.message);
   } finally {
     $('guardarBtn').disabled = false;
-    $('guardarBtn').textContent = 'Guardar factura';
+    $('guardarBtn').textContent = editingId ? 'Guardar cambios' : 'Guardar factura';
   }
 });
+
+// El servidor responde 409 con { duplicado, existentes } cuando ya hay una
+// factura guardada con el mismo # y proveedor/cliente (ver POST /api/finanzas
+// en server/index.js). No bloquea: le mostramos el aviso al usuario y, si
+// confirma que quiere guardarla igual, reintentamos con
+// confirmar_duplicado=true para que el servidor no vuelva a preguntar.
+async function guardarFactura(url, method, payload) {
+  let res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  let data = await res.json();
+
+  if (res.status === 409 && data.duplicado) {
+    const detalles = data.existentes.map((e) => {
+      const f = e.fecha ? new Date(e.fecha).toLocaleDateString('es-PA') : 'sin fecha';
+      return `• #${e.numero_factura} — ${e.contraparte} — ${money(e.total)} (${f})`;
+    }).join('\n');
+    const seguir = confirm(`⚠️ Ya existe una factura guardada con el mismo número y proveedor/cliente:\n\n${detalles}\n\n¿Guardar de todas formas?`);
+    if (!seguir) throw new Error('CANCELADO_POR_USUARIO');
+    payload.confirmar_duplicado = true;
+    res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    data = await res.json();
+  }
+
+  if (!res.ok) throw new Error(data.error || 'no se pudo guardar');
+  return data;
+}
 
 async function editarFactura(id) {
   const res = await fetch(`/api/finanzas/${id}`);

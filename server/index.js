@@ -551,9 +551,24 @@ app.post('/api/finanzas', async (req, res) => {
   const {
     tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total,
     proyecto, items, notas, archivo_nombre, archivo_tipo, archivo_base64, datos_extraidos,
+    confirmar_duplicado,
   } = req.body || {};
   if (!tipo || !['gasto', 'emitida'].includes(tipo)) return res.status(400).json({ error: 'tipo debe ser "gasto" o "emitida"' });
   if (total == null || total === '') return res.status(400).json({ error: 'falta el total' });
+
+  // Aviso de posible duplicado (no bloquea): mismo # de factura + mismo
+  // proveedor/cliente ya guardado — típico de tocar "Guardar" dos veces o
+  // re-subir por error una foto ya procesada. El usuario confirma a
+  // propósito con confirmar_duplicado=true si de verdad quiere guardarla
+  // igual (ej. una nota de crédito con el mismo número que la original).
+  if (numero_factura && contraparte && !confirmar_duplicado) {
+    const { rows: existentes } = await pool.query(
+      `SELECT id, tipo, contraparte, numero_factura, fecha, total FROM finance_invoices
+       WHERE LOWER(numero_factura) = LOWER($1) AND LOWER(contraparte) = LOWER($2)`,
+      [numero_factura, contraparte]
+    );
+    if (existentes.length) return res.status(409).json({ duplicado: true, existentes });
+  }
 
   const archivoBuffer = archivo_base64 ? Buffer.from(archivo_base64, 'base64') : null;
 
