@@ -16,6 +16,9 @@ const COMPANY = {
 };
 
 const LOGO_PATH = path.join(__dirname, 'assets', 'logo.png');
+// Firma escaneada con el fondo removido (shared/removeWhiteBackground.js) —
+// así se superpone sobre la línea de firma sin un recuadro blanco encima.
+const FIRMA_PATH = path.join(__dirname, 'assets', 'firma.png');
 
 function money(n) {
   return 'B/. ' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -154,8 +157,13 @@ function generateQuotePdf({ quote, opportunity }) {
 
     // ===== Signature =====
     y = Math.max(y, doc.page.height - 150);
-    doc.moveTo(marginX, y).lineTo(marginX + 220, y).strokeColor('#cccccc').stroke();
-    y += 6;
+    const firmaH = 52;
+    const lineaFirmaY = y + firmaH + 2;
+    if (fs.existsSync(FIRMA_PATH)) {
+      try { doc.image(FIRMA_PATH, marginX + 6, y, { height: firmaH }); } catch (e) {}
+    }
+    doc.moveTo(marginX, lineaFirmaY).lineTo(marginX + 220, lineaFirmaY).strokeColor('#cccccc').stroke();
+    y = lineaFirmaY + 6;
     doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('Ing. Dionisio Sánchez', marginX, y);
     doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('Representante Legal', marginX, y + 12);
 
