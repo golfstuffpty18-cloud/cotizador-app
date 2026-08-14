@@ -528,7 +528,7 @@ app.get('/api/finanzas/resumen', async (req, res) => {
 
 app.get('/api/finanzas/:id', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, created_at
+    `SELECT id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, created_at
      FROM finance_invoices WHERE id = $1`,
     [req.params.id]
   );
@@ -549,7 +549,7 @@ app.get('/api/finanzas/:id/archivo', async (req, res) => {
 
 app.post('/api/finanzas', async (req, res) => {
   const {
-    tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total,
+    tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total,
     proyecto, items, notas, archivo_nombre, archivo_tipo, archivo_base64, datos_extraidos,
     confirmar_duplicado,
   } = req.body || {};
@@ -574,11 +574,11 @@ app.post('/api/finanzas', async (req, res) => {
 
   const { rows } = await pool.query(
     `INSERT INTO finance_invoices
-       (tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, archivo, datos_extraidos)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-     RETURNING id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
+       (tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, archivo, datos_extraidos)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+     RETURNING id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
     [
-      tipo, contraparte || null, ruc || null, numero_factura || null, fecha || null,
+      tipo, contraparte || null, ruc || null, direccion || null, telefono || null, correo || null, numero_factura || null, fecha || null,
       subtotal || null, itbm || null, total, proyecto || null,
       items ? JSON.stringify(items) : null, notas || null,
       archivo_nombre || null, archivo_tipo || null, archivoBuffer,
@@ -595,15 +595,15 @@ app.post('/api/finanzas', async (req, res) => {
 });
 
 app.put('/api/finanzas/:id', async (req, res) => {
-  const { tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas } = req.body || {};
+  const { tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, notas } = req.body || {};
   const { rows } = await pool.query(
     `UPDATE finance_invoices SET
-       tipo = COALESCE($1, tipo), contraparte = $2, ruc = $3, numero_factura = $4, fecha = $5,
-       subtotal = $6, itbm = $7, total = COALESCE($8, total), proyecto = $9, notas = $10, updated_at = now()
-     WHERE id = $11
-     RETURNING id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
-    [tipo || null, contraparte || null, ruc || null, numero_factura || null, fecha || null,
-      subtotal || null, itbm || null, total, proyecto || null, notas || null, req.params.id]
+       tipo = COALESCE($1, tipo), contraparte = $2, ruc = $3, direccion = $4, telefono = $5, correo = $6,
+       numero_factura = $7, fecha = $8, subtotal = $9, itbm = $10, total = COALESCE($11, total), proyecto = $12, notas = $13, updated_at = now()
+     WHERE id = $14
+     RETURNING id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
+    [tipo || null, contraparte || null, ruc || null, direccion || null, telefono || null, correo || null,
+      numero_factura || null, fecha || null, subtotal || null, itbm || null, total, proyecto || null, notas || null, req.params.id]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
@@ -612,6 +612,44 @@ app.put('/api/finanzas/:id', async (req, res) => {
 app.delete('/api/finanzas/:id', async (req, res) => {
   await pool.query('DELETE FROM finance_invoices WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
+});
+
+// Reprocesa con Claude Vision las facturas emitidas que ya se habían subido
+// antes de que existieran los campos dirección/teléfono/correo, para
+// completárselos. Solo llena huecos (COALESCE) — nunca pisa un dato que el
+// usuario ya haya revisado o corregido — así que es seguro correrlo más de
+// una vez (las que ya quedaron completas simplemente no vuelven a salir en
+// el filtro WHERE).
+app.all('/api/cron/backfill-cliente-info', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, archivo, archivo_tipo FROM finance_invoices
+     WHERE tipo = 'emitida' AND archivo IS NOT NULL
+       AND (direccion IS NULL OR telefono IS NULL OR correo IS NULL)`
+  );
+
+  let actualizadas = 0;
+  const errores = [];
+  for (const row of rows) {
+    try {
+      const extraido = await extractInvoiceData(row.archivo, row.archivo_tipo);
+      await pool.query(
+        `UPDATE finance_invoices SET
+           direccion = COALESCE(direccion, $1), telefono = COALESCE(telefono, $2), correo = COALESCE(correo, $3)
+         WHERE id = $4`,
+        [extraido.direccion || null, extraido.telefono || null, extraido.correo || null, row.id]
+      );
+      actualizadas++;
+    } catch (err) {
+      errores.push({ id: row.id, error: err.message });
+    }
+  }
+
+  res.json({ revisadas: rows.length, actualizadas, errores });
 });
 
 // Manejador de errores global: sin esto, un error atrapado por

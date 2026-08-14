@@ -118,8 +118,8 @@
     </div>
 
     <label class="file-drop" id="fileDrop">
-      📷 Toca para tomar foto o elegir archivo (JPG, PNG o PDF)
-      <input type="file" id="fileInput" accept="image/*,application/pdf" capture="environment">
+      📷 Toca para tomar foto(s) o elegir archivo(s) — puedes seleccionar varios a la vez
+      <input type="file" id="fileInput" accept="image/*,application/pdf" multiple>
     </label>
     <div class="manual-link" id="manualBtn">✏️ Agregar gasto sin factura (manual)</div>
 
@@ -132,6 +132,14 @@
       <div class="row2">
         <div><label>RUC</label><input type="text" id="fRuc"></div>
         <div><label># Factura</label><input type="text" id="fNumero"></div>
+      </div>
+
+      <label>Dirección (opcional)</label>
+      <input type="text" id="fDireccion">
+
+      <div class="row2">
+        <div><label>Teléfono (opcional)</label><input type="text" id="fTelefono"></div>
+        <div><label>Correo (opcional)</label><input type="email" id="fCorreo"></div>
       </div>
 
       <div class="row2">

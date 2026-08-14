@@ -3,6 +3,15 @@
 let pending = null; // { archivo_nombre, archivo_tipo, archivo_base64, datos_extraidos } | null
 let editingId = null; // id de la factura en edición, o null si es una nueva
 
+// Carga en grupo: cuando se seleccionan varios archivos a la vez, se
+// procesan uno por uno (extracción + revisión + guardado) en vez de todos de
+// golpe, reutilizando el mismo formulario — así el usuario sigue revisando
+// cada una antes de guardarla, solo que sin tener que tocar "elegir archivo"
+// entre cada una.
+let fileQueue = [];
+let queueTotal = 0;
+let queuePosition = 0;
+
 const $ = (id) => document.getElementById(id);
 
 function escapeHtml(str) {
@@ -29,12 +38,18 @@ function resetForm() {
   $('extraccionEstado').innerHTML = '';
   pending = null;
   editingId = null;
+  fileQueue = [];
+  queueTotal = 0;
+  queuePosition = 0;
   $('guardarBtn').textContent = 'Guardar factura';
 }
 
 function fillForm(data) {
   $('fContraparte').value = data.contraparte || '';
   $('fRuc').value = data.ruc || '';
+  $('fDireccion').value = data.direccion || '';
+  $('fTelefono').value = data.telefono || '';
+  $('fCorreo').value = data.correo || '';
   $('fNumero').value = data.numero_factura || '';
   // Ojo: NO se rellena con la fecha de hoy cuando Claude no pudo leerla — si
   // se rellenara sola con "hoy" el usuario podría no notarlo y guardar una
@@ -51,11 +66,12 @@ function fillForm(data) {
   $('reviewForm').classList.add('show');
 }
 
-$('fileInput').addEventListener('change', async () => {
-  const file = $('fileInput').files[0];
-  if (!file) return;
+function prefijoCola() {
+  return queueTotal > 1 ? `Factura ${queuePosition} de ${queueTotal} — ` : '';
+}
 
-  $('extraccionEstado').innerHTML = '<div class="spinner">🔎 Leyendo la factura con Claude Vision…</div>';
+async function procesarArchivo(file) {
+  $('extraccionEstado').innerHTML = `<div class="spinner">🔎 ${prefijoCola()}Leyendo la factura con Claude Vision…</div>`;
   $('reviewForm').classList.remove('show');
 
   const fd = new FormData();
@@ -67,14 +83,14 @@ $('fileInput').addEventListener('change', async () => {
     data = await res.json();
     if (!res.ok) throw new Error(data.error || 'no se pudo leer la factura');
   } catch (err) {
-    $('extraccionEstado').innerHTML = `<div class="error-msg">⚠️ ${err.message}. Puedes llenar los datos manualmente.</div>`;
+    $('extraccionEstado').innerHTML = `<div class="error-msg">⚠️ ${prefijoCola()}${err.message}. Puedes llenar los datos manualmente.</div>`;
     pending = { archivo_nombre: file.name, archivo_tipo: file.type, archivo_base64: null, datos_extraidos: null };
     editingId = null;
     fillForm({});
     return;
   }
 
-  let mensaje = '<div class="aviso-baja">✅ Datos extraídos — revisa y corrige antes de guardar.</div>';
+  let mensaje = `<div class="aviso-baja">${prefijoCola()}✅ Datos extraídos — revisa y corrige antes de guardar.</div>`;
   if (!data.extraido.fecha) {
     mensaje += '<div class="error-msg">⚠️ No se pudo leer la fecha en la foto — escríbela tú abajo, si no la factura queda como "Sin fecha" y no se va a agrupar en su mes.</div>';
   }
@@ -88,6 +104,27 @@ $('fileInput').addEventListener('change', async () => {
   editingId = null;
   fillForm(data.extraido);
   if (!data.extraido.fecha) $('fFecha').classList.add('needs-review');
+}
+
+// Avanza al siguiente archivo de la cola (tras guardar uno, o al saltarlo
+// con "Cancelar"); si ya no queda ninguno, vuelve al estado vacío normal.
+function siguienteEnCola() {
+  if (fileQueue.length === 0) {
+    resetForm();
+    return;
+  }
+  queuePosition++;
+  const file = fileQueue.shift();
+  procesarArchivo(file);
+}
+
+$('fileInput').addEventListener('change', () => {
+  const files = Array.from($('fileInput').files || []);
+  if (!files.length) return;
+  fileQueue = files;
+  queueTotal = files.length;
+  queuePosition = 0;
+  siguienteEnCola();
 });
 
 // Gastos sin factura (propina, pago informal, algo que nunca dio recibo...)
@@ -98,6 +135,9 @@ $('manualBtn').addEventListener('click', () => {
   updateTipoToggleClasses();
   pending = null;
   editingId = null;
+  fileQueue = []; // un gasto manual interrumpe cualquier lote de fotos en curso
+  queueTotal = 0;
+  queuePosition = 0;
   $('fileInput').value = '';
   $('extraccionEstado').innerHTML = '<div class="aviso-baja">✏️ Gasto manual sin factura — llena los datos y guarda.</div>';
   fillForm({});
@@ -105,7 +145,12 @@ $('manualBtn').addEventListener('click', () => {
   $('reviewForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-$('cancelarBtn').addEventListener('click', resetForm);
+// Si hay más facturas en cola (carga en grupo), "Cancelar" salta la actual y
+// sigue con la próxima en vez de cerrar todo el formulario.
+$('cancelarBtn').addEventListener('click', () => {
+  if (fileQueue.length > 0) siguienteEnCola();
+  else resetForm();
+});
 
 $('reviewForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -114,6 +159,9 @@ $('reviewForm').addEventListener('submit', async (e) => {
     tipo,
     contraparte: $('fContraparte').value.trim(),
     ruc: $('fRuc').value.trim() || null,
+    direccion: $('fDireccion').value.trim() || null,
+    telefono: $('fTelefono').value.trim() || null,
+    correo: $('fCorreo').value.trim() || null,
     numero_factura: $('fNumero').value.trim() || null,
     fecha: $('fFecha').value || null,
     subtotal: $('fSubtotal').value !== '' ? Number($('fSubtotal').value) : null,
@@ -137,7 +185,11 @@ $('reviewForm').addEventListener('submit', async (e) => {
       });
       await guardarFactura('/api/finanzas', 'POST', payload);
     }
-    resetForm();
+    // Si venía de una carga en grupo, sigue con la próxima de la cola en vez
+    // de cerrar el formulario — así se revisan/guardan una por una sin tener
+    // que volver a tocar "elegir archivo" entre cada una.
+    if (fileQueue.length > 0) siguienteEnCola();
+    else resetForm();
     await Promise.all([loadResumen(), loadFacturas(), loadProyectos()]);
   } catch (err) {
     if (err.message !== 'CANCELADO_POR_USUARIO') alert('Error: ' + err.message);

@@ -124,6 +124,9 @@ CREATE TABLE IF NOT EXISTS finance_invoices (
 CREATE INDEX IF NOT EXISTS idx_finance_invoices_fecha ON finance_invoices(fecha);
 CREATE INDEX IF NOT EXISTS idx_finance_invoices_tipo ON finance_invoices(tipo);
 CREATE INDEX IF NOT EXISTS idx_finance_invoices_proyecto ON finance_invoices(proyecto);
+ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS direccion TEXT;
+ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS telefono TEXT;
+ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS correo TEXT;
 
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;

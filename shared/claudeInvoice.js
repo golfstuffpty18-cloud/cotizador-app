@@ -31,6 +31,12 @@ const SCHEMA = {
       description: 'Nombre del proveedor (si es una factura de compra/gasto) o del cliente (si es una factura emitida a un cliente).',
     },
     ruc: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    direccion: {
+      anyOf: [{ type: 'string' }, { type: 'null' }],
+      description: 'Dirección del proveedor/cliente (la contraparte), si aparece impresa en la factura.',
+    },
+    telefono: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    correo: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     numero_factura: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     fecha: {
       anyOf: [{ type: 'string', description: 'Fecha de la factura en formato YYYY-MM-DD' }, { type: 'null' }],
@@ -57,7 +63,7 @@ const SCHEMA = {
       ],
     },
   },
-  required: ['contraparte', 'ruc', 'numero_factura', 'fecha', 'subtotal', 'itbm', 'total', 'items'],
+  required: ['contraparte', 'ruc', 'direccion', 'telefono', 'correo', 'numero_factura', 'fecha', 'subtotal', 'itbm', 'total', 'items'],
   additionalProperties: false,
 };
 
@@ -88,7 +94,7 @@ async function extractInvoiceData(buffer, mimetype) {
         contentBlock,
         {
           type: 'text',
-          text: 'Esta imagen o documento es una factura de una empresa panameña (puede ser una factura de compra/gasto recibida de un proveedor, o una factura emitida a un cliente). Extrae los datos exactamente como aparecen en el documento, sin inventar ni redondear. Si un dato no aparece o no se puede leer con certeza, usa null en vez de adivinar. La fecha debe ir en formato YYYY-MM-DD.',
+          text: 'Esta imagen o documento es una factura de una empresa panameña (puede ser una factura de compra/gasto recibida de un proveedor, o una factura emitida a un cliente). Extrae los datos exactamente como aparecen en el documento, sin inventar ni redondear, incluyendo la dirección, teléfono y correo electrónico del proveedor/cliente si aparecen impresos en la factura. Si un dato no aparece o no se puede leer con certeza, usa null en vez de adivinar. La fecha debe ir en formato YYYY-MM-DD.',
         },
       ],
     }],
