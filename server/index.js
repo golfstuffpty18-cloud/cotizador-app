@@ -413,7 +413,7 @@ app.all('/api/cron/test-push', async (req, res) => {
   }
 });
 
-const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Materiales', 'Otro'];
+const CATEGORIAS = ['CCTV', 'Alarma de Intrusión', 'Control de Acceso', 'Control de Asistencia', 'Detección de Incendio', 'Automatización', 'Voz y Datos', 'Materiales', 'Otro'];
 
 app.get('/api/catalog/categorias', (req, res) => res.json(CATEGORIAS));
 

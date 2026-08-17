@@ -13,26 +13,35 @@ const CATEGORY_KEYWORDS = {
   'CCTV': [
     'camara de seguridad', 'cámara de seguridad', 'camara de vigilancia', 'cámara de vigilancia',
     'camaras de seguridad', 'cámaras de seguridad', 'camaras de vigilancia', 'cámaras de vigilancia',
+    'camara de video vigilancia', 'cámara de video vigilancia', 'camaras de video vigilancia', 'cámaras de video vigilancia',
     'camara ip', 'cámara ip', 'camaras ip', 'cámaras ip', 'camara ptz', 'cámara ptz', 'camara ir', 'cámara ir',
     'sistema de camaras', 'sistema de cámaras', 'circuito cerrado de television', 'circuito cerrado de televisión',
     'cctv', 'videovigilancia', 'video vigilancia',
   ],
   'Alarma de Intrusión': [
-    'alarma', 'intrusion', 'intrusión', 'sensor de movimiento',
+    'alarma', 'intrusion', 'intrusión', 'sensor de movimiento', 'alarma contra robo',
   ],
   'Control de Acceso': [
     'control de acceso', 'biometri', 'torniquete', 'cerradura electr',
+    'barrera vehicular', 'barreras vehiculares',
+  ],
+  'Control de Asistencia': [
+    'reloj de marcacion', 'reloj de marcación', 'reloj de asistencia', 'marcador de asistencia',
+    'control de asistencia',
   ],
   'Detección de Incendio': [
-    'deteccion de incendio', 'detección de incendio', 'contra incendio',
-    'detector de humo', 'deteccion de humo', 'detección de humo', 'sensor de humo', 'alarma de humo',
-    'panel de alarma contra incendio',
+    'deteccion de incendio', 'detección de incendio', 'contra incendio', 'alarma contra incendio',
+    'detector de humo', 'deteccion de humo', 'detección de humo', 'sensor de humo', 'sensores de humo', 'alarma de humo',
+    'panel de alarma contra incendio', 'panel de incendio',
+    'sensor de calor', 'sensores de calor', 'estacion manual', 'estación manual', 'sirena estrobo', 'sirenas estrobo',
   ],
   'Automatización': [
     'automatizacion', 'automatización', 'domotica', 'domótica',
   ],
   'Voz y Datos': [
-    'cableado estructurado', 'voz y datos', 'red de datos', 'punto de red',
+    'cableado estructurado', 'voz y datos', 'red de datos', 'punto de red', 'puntos de red',
+    'redes', 'wifi', 'cableado de red', 'certificacion de red', 'certificación de red',
+    'patch panel', 'switch', 'patch cord', 'herramientas de red',
   ],
   'Otro': [
     'seguridad electronica', 'seguridad electrónica',
@@ -74,7 +83,7 @@ function evaluate({ title, referencePrice }) {
       categoryMatch: false,
       category: null,
       recommendation: 'revisar',
-      reasoning: 'El título no menciona explícitamente palabras del rubro (videovigilancia, alarmas, control de acceso, incendio, automatización, voz y datos). Revisar manualmente antes de descartar.',
+      reasoning: 'El título no menciona explícitamente palabras del rubro (videovigilancia, alarmas, control de acceso, control de asistencia, incendio, automatización, voz y datos). Revisar manualmente antes de descartar.',
     };
   }
 
