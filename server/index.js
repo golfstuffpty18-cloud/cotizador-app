@@ -86,7 +86,15 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 // pasa, sin que nadie tenga que volver a consultar PanamaCompra, cae sola en
 // la pantalla principal. pc_estado='programada' es solo el respaldo para
 // las pocas filas donde window_info no se pudo parsear.
-const ES_PROGRAMADA_SQL = `((window_start IS NOT NULL AND window_start > now()) OR (window_start IS NULL AND pc_estado = 'programada'))`;
+//
+// COALESCE(...,false) es necesario: sin él, una fila con window_start Y
+// pc_estado ambos NULL (ej. Compra Menor, que nunca tiene "programada")
+// evalúa la comparación "pc_estado = 'programada'" a NULL en vez de false
+// (lógica de 3 valores de SQL) — eso propaga NULL a través del OR, y luego
+// NOT NULL también es NULL, así que la fila desaparecía de AMBAS vistas en
+// vez de quedarse en "hoy". Bug real, encontrado probando en producción con
+// la cotización de Cultura (Compra Menor) justo después del primer deploy.
+const ES_PROGRAMADA_SQL = `COALESCE((window_start IS NOT NULL AND window_start > now()) OR (window_start IS NULL AND pc_estado = 'programada'), false)`;
 
 app.get('/api/opportunities', async (req, res) => {
   const source = req.query.source || 'panamacompra';
