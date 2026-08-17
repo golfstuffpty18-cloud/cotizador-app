@@ -5,7 +5,7 @@ const { pool, init, cleanupExpired, isActProcessed, markActProcessed, hasBeenAle
 const { upsertOpportunity } = require('./opportunities');
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
-const { parseDeadline } = require('./parseWindow');
+const { parseDeadline, parseWindowStart } = require('./parseWindow');
 
 const SUBJECT_RE = /Solicitud de cotizaci[oó]n en l[ií]nea\s*-\s*([\w-]+)/i;
 const ENTITY_RE = /entidad\s+([\s\S]+?)\s*,\s*ha publicado/i;
@@ -232,7 +232,7 @@ async function runCheckEmailJobInner(push) {
 
     for (const e of newActNumbers) {
       try {
-        const registros = await pc.buscarProcesoCualquierEstado(cookie, e.actNumber);
+        const { registros, pcEstado } = await pc.buscarProcesoCualquierEstado(cookie, e.actNumber);
         if (!registros.length) {
           push(`Sin registros en PanamaCompra para ${e.actNumber} (aún no visible en portal)`);
           continue;
@@ -247,18 +247,20 @@ async function runCheckEmailJobInner(push) {
           const entityProvince = campos['Provincia'] || '';
           const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
           const deadline = parseDeadline(windowInfo);
+          const windowStart = parseWindowStart(windowInfo);
 
           const ev = evaluate({ title, referencePrice });
 
           const op = {
             actNumber: e.actNumber,
             convocatoria: String(r.numeroConvocatoria),
-            title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, items,
+            title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, windowStart, items,
             categoryMatch: ev.categoryMatch,
             category: ev.category,
             recommendation: ev.recommendation,
             reasoning: ev.reasoning,
             emailUid: e.uid,
+            pcEstado,
           };
 
           const inserted = await saveOpportunity(op);

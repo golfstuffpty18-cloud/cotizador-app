@@ -1,5 +1,5 @@
 const { Pool } = require('pg');
-const { parseDeadline } = require('./parseWindow');
+const { parseDeadline, parseWindowStart } = require('./parseWindow');
 
 // Sin estos timeouts, una consulta o conexión atascada (ej. un corte breve
 // hacia Render Postgres) deja la petición HTTP colgada para siempre — el
@@ -137,6 +137,15 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS tecnologia_incendio TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'panamacompra';
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS documentos_pliego JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS documentos_synced_at TIMESTAMPTZ;
+-- Estado del proceso en PanamaCompra al momento de guardarse ('programada' o
+-- 'abierta') — respaldo para cuando window_start no se pudo calcular
+-- (formato de texto inesperado). La clasificación real programada/abierta
+-- que usa /api/opportunities es dinámica, basada en window_start: en cuanto
+-- pasa esa hora, el proceso se ve como "de hoy" solo sin tener que volver a
+-- consultar PanamaCompra. Oportunidades guardadas antes de esta columna
+-- quedan en NULL y se ven en la pantalla principal.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS pc_estado TEXT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS window_start TIMESTAMPTZ;
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS subcategoria TEXT;
 `;
 
@@ -152,6 +161,7 @@ WHERE source != 'directo'
 async function init() {
   await pool.query(SCHEMA);
   await backfillDeadlines();
+  await backfillWindowStarts();
   await backfillProcessedActs();
 }
 
@@ -176,6 +186,23 @@ async function backfillDeadlines() {
     const deadline = parseDeadline(row.window_info);
     if (deadline) {
       await pool.query('UPDATE opportunities SET deadline = $1 WHERE id = $2', [deadline, row.id]);
+    }
+  }
+  return rows.length;
+}
+
+// Igual que backfillDeadlines pero para window_start — necesario tanto para
+// filas guardadas antes de que esta columna existiera como, sobre todo,
+// para las 4 oportunidades ya guardadas antes de que se empezara a calcular
+// (quedarían sin poder distinguirse como programada/abierta si no).
+async function backfillWindowStarts() {
+  const { rows } = await pool.query(
+    `SELECT id, window_info FROM opportunities WHERE window_start IS NULL AND window_info IS NOT NULL`
+  );
+  for (const row of rows) {
+    const windowStart = parseWindowStart(row.window_info);
+    if (windowStart) {
+      await pool.query('UPDATE opportunities SET window_start = $1 WHERE id = $2', [windowStart, row.id]);
     }
   }
   return rows.length;

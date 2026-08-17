@@ -1,6 +1,6 @@
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
-const { parseDeadline } = require('./parseWindow');
+const { parseDeadline, parseWindowStart } = require('./parseWindow');
 const { isActProcessed, markActProcessed } = require('./db');
 const { upsertOpportunity } = require('./opportunities');
 
@@ -18,6 +18,12 @@ const MAX_DETALLES = 30;
 // si se dan, un acto fuera de rango NO se guarda ni se marca como
 // procesado, para que otra búsqueda sin ese filtro (o con un rango
 // distinto) lo pueda seguir encontrando después.
+// label es el texto que se muestra en el resumen de búsqueda ("Abiertas",
+// "Programadas", "Vigentes"); pcEstado es lo que se guarda en
+// opportunities.pc_estado ('abierta'/'programada'/null para Compra Menor,
+// que no tiene esa distinción).
+const LABEL_TO_PC_ESTADO = { Abiertas: 'abierta', Programadas: 'programada' };
+
 async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioMin, precioMax } = {}) {
   const registros = await pc.buscarPorEstados(cookie, [idEstado], undefined, idTipoProceso);
   const candidatas = registros.filter(r => evaluate({ title: r.titulo }).categoryMatch);
@@ -43,16 +49,18 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
     const entityProvince = campos['Provincia'] || '';
     const windowInfo = campos['Fecha y hora presentación de cotizaciones'] || '';
     const deadline = parseDeadline(windowInfo);
+    const windowStart = parseWindowStart(windowInfo);
     const ev = evaluate({ title, referencePrice });
 
     const op = {
       actNumber,
       convocatoria: String(r.numeroConvocatoria),
-      title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, items,
+      title, entity, entityAddress, entityProvince, referencePrice, windowInfo, deadline, windowStart, items,
       categoryMatch: ev.categoryMatch,
       category: ev.category,
       recommendation: ev.recommendation,
       reasoning: ev.reasoning,
+      pcEstado: LABEL_TO_PC_ESTADO[label] || null,
     };
 
     const row = await upsertOpportunity(op);

@@ -64,18 +64,23 @@ async function buscarProceso(cookie, numProceso, idEstado, idTipoProceso = TIPO_
 // estado (ventana de cotización aún no abierta), y solo más tarde pasa a
 // "Abierta". Buscar Programada primero evita el retraso de minutos/horas que
 // había antes esperando a que el proceso apareciera como Abierta.
+// pcEstado normaliza el idEstado numérico de PanamaCompra a lo que guarda
+// opportunities.pc_estado ('programada'/'abierta'/null) — null para Cerrada,
+// Cancelado o Compra Menor, donde la distinción programada/abierta no aplica.
+const PC_ESTADO_LABEL = { [ESTADO.PROGRAMADA]: 'programada', [ESTADO.ABIERTA]: 'abierta' };
+
 async function buscarProcesoCualquierEstado(cookie, numProceso) {
   for (const idEstado of [ESTADO.PROGRAMADA, ESTADO.ABIERTA, ESTADO.CERRADA, ESTADO.CANCELADO]) {
     const registros = await buscarProceso(cookie, numProceso, idEstado);
-    if (registros.length) return registros;
+    if (registros.length) return { registros, pcEstado: PC_ESTADO_LABEL[idEstado] || null };
   }
   // También puede ser un acto de "Compra Menor" (tipo de proceso distinto,
   // con muchos más estados posibles que Cotización en línea — Vigente,
   // Adjudicado, Desierto, Por adjudicar, etc.) — se busca con idEstado:0
   // (cualquier estado) en vez de enumerarlos todos uno por uno.
   const compraMenor = await buscarProceso(cookie, numProceso, 0, TIPO_PROCESO_COMPRA_MENOR);
-  if (compraMenor.length) return compraMenor;
-  return [];
+  if (compraMenor.length) return { registros: compraMenor, pcEstado: null };
+  return { registros: [], pcEstado: null };
 }
 
 // Trae en una sola llamada todos los procesos de cotización en los estados

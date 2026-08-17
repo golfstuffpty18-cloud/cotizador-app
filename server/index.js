@@ -80,13 +80,24 @@ app.post('/api/push/unsubscribe', async (req, res) => {
   res.json({ ok: true });
 });
 
+// "Programada" es dinámico, no un estado guardado que haya que mantener
+// sincronizado: si window_start (la hora en que PanamaCompra la pasa a
+// "Abierta" automáticamente) todavía no llegó, es programada; en cuanto
+// pasa, sin que nadie tenga que volver a consultar PanamaCompra, cae sola en
+// la pantalla principal. pc_estado='programada' es solo el respaldo para
+// las pocas filas donde window_info no se pudo parsear.
+const ES_PROGRAMADA_SQL = `((window_start IS NOT NULL AND window_start > now()) OR (window_start IS NULL AND pc_estado = 'programada'))`;
+
 app.get('/api/opportunities', async (req, res) => {
   const source = req.query.source || 'panamacompra';
+  const vista = req.query.vista === 'programadas' ? 'programadas' : 'hoy';
+  const condicionVista = vista === 'programadas' ? ES_PROGRAMADA_SQL : `NOT ${ES_PROGRAMADA_SQL}`;
   const { rows } = await pool.query(
     `SELECT * FROM opportunities
      WHERE (deadline IS NULL OR deadline > now())
        AND decision != 'no_participar'
        AND source = $1
+       AND ${condicionVista}
      ORDER BY created_at DESC LIMIT 100`,
     [source]
   );
