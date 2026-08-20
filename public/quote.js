@@ -119,8 +119,22 @@ function render(opp, quote) {
   const btnSyncDocs = document.getElementById('btnSyncDocs');
   const syncDocsMsg = document.getElementById('syncDocsMsg');
   if (btnSyncDocs) btnSyncDocs.addEventListener('click', async () => {
-    syncDocsMsg.textContent = 'Buscando documentos en PanamaCompra y subiéndolos a Dropbox… esto corre en segundo plano, puedes volver a pulsar el botón en unos segundos para ver el resultado.';
-    await fetch(`/api/opportunities/${oppId}/sync-documentos`, { method: 'POST' });
+    btnSyncDocs.disabled = true;
+    syncDocsMsg.textContent = 'Buscando documentos en PanamaCompra y subiéndolos a Dropbox…';
+    try {
+      const res = await fetch(`/api/opportunities/${oppId}/sync-documentos`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        syncDocsMsg.textContent = '❌ ' + (data.error || 'No se pudo sincronizar los documentos.');
+        return;
+      }
+      syncDocsMsg.textContent = '✅ ' + data.mensaje;
+      load();
+    } catch (err) {
+      syncDocsMsg.textContent = '❌ Error al sincronizar: ' + err.message;
+    } finally {
+      btnSyncDocs.disabled = false;
+    }
   });
 
   const fileInput = document.getElementById('fileInput');

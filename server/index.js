@@ -175,8 +175,9 @@ app.post('/api/opportunities/:id/decision', async (req, res) => {
 app.post('/api/opportunities/:id/sync-documentos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
-  syncOpportunityDocs(rows[0]);
-  res.json({ ok: true, mensaje: 'Buscando documentos adjuntos en segundo plano…' });
+  const result = await syncOpportunityDocs(rows[0]);
+  if (!result.ok) return res.status(502).json({ error: result.error });
+  res.json({ ok: true, count: result.count, mensaje: result.count ? `${result.count} documento(s) sincronizado(s).` : 'El acto no trae documentos adjuntos en PanamaCompra.' });
 });
 
 app.get('/api/opportunities/:id', async (req, res) => {

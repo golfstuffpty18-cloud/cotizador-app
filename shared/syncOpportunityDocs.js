@@ -22,14 +22,15 @@ async function extraerTexto(buffer) {
 // respaldo/enriquecimiento secundario, igual que uploadToDropboxSafe — un
 // fallo acá no debe romper el flujo de decisión de la oportunidad.
 async function syncOpportunityDocs(opportunity) {
-  if (!opportunity || opportunity.source !== 'panamacompra') return;
+  if (!opportunity || opportunity.source !== 'panamacompra') return { ok: false, error: 'oportunidad sin acto de PanamaCompra' };
 
   try {
     const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
     const { registros } = await pc.buscarProcesoCualquierEstado(cookie, opportunity.act_number);
     if (!registros.length) {
-      console.error(`syncOpportunityDocs: no se encontró el acto ${opportunity.act_number} en PanamaCompra`);
-      return;
+      const msg = `no se encontró el acto ${opportunity.act_number} en PanamaCompra`;
+      console.error(`syncOpportunityDocs: ${msg}`);
+      return { ok: false, error: msg };
     }
     // idTipoProceso viene del registro encontrado (puede ser Cotización en
     // línea o Compra Menor) — verPliego lo necesita para armar la URL
@@ -74,8 +75,10 @@ async function syncOpportunityDocs(opportunity) {
       `UPDATE opportunities SET documentos_pliego = $1, documentos_synced_at = now() WHERE id = $2`,
       [JSON.stringify(documentos), opportunity.id]
     );
+    return { ok: true, count: documentos.length };
   } catch (err) {
     console.error(`syncOpportunityDocs: falló para la oportunidad ${opportunity.id}:`, err.message);
+    return { ok: false, error: err.message };
   }
 }
 
