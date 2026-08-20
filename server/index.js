@@ -194,7 +194,11 @@ app.post('/api/opportunities/:id/sync-documentos', async (req, res) => {
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   const result = await syncOpportunityDocs(rows[0]);
   if (!result.ok) return res.status(502).json({ error: result.error });
-  res.json({ ok: true, count: result.count, mensaje: result.count ? `${result.count} documento(s) sincronizado(s).` : 'El acto no trae documentos adjuntos en PanamaCompra.' });
+  let mensaje = result.count ? `${result.count} documento(s) sincronizado(s).` : 'El acto no trae documentos adjuntos en PanamaCompra.';
+  if (result.dropboxFailures) {
+    mensaje += ` ⚠️ ${result.dropboxFailures} no se pudo(eron) respaldar en Dropbox — vuelve a intentar antes de salir sin conexión a tus archivos locales.`;
+  }
+  res.json({ ok: true, count: result.count, dropboxFailures: result.dropboxFailures, mensaje });
 });
 
 app.get('/api/opportunities/:id', async (req, res) => {

@@ -212,6 +212,7 @@ function renderDocumentos(opp) {
     <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
       <p style="margin:0;font-size:.82rem;font-weight:700;color:var(--navy)">${escapeHtml(d.nombreOriginal)}</p>
       <p style="margin:2px 0 0;font-size:.75rem;color:var(--gray-400)">${escapeHtml(d.tipoArchivo || '')}${d.descripcion ? ' · ' + escapeHtml(d.descripcion) : ''}</p>
+      ${d.dropboxOk === false ? '<p style="margin:6px 0 0;font-size:.75rem;color:#c0392b;font-weight:700">⚠️ No se pudo respaldar en Dropbox — pulsa "Buscar documentos adjuntos" para reintentar antes de salir sin acceso a tus archivos.</p>' : ''}
       ${d.textoExtraido ? `
         <details style="margin-top:6px">
           <summary style="font-size:.76rem;color:var(--blue);cursor:pointer">Ver texto extraído</summary>

@@ -5,6 +5,20 @@ const { pool } = require('./db');
 
 const MAX_TEXTO_CHARS = 20000;
 
+// El archivo del pliego solo queda guardado en Dropbox — la app no conserva
+// una copia propia del binario, solo el nombre/texto extraído en la base de
+// datos. El usuario depende de esa copia de Dropbox para tener el documento
+// a mano cotizando desde otro equipo, así que un fallo de subida acá no
+// puede quedar en silencio: se reintenta una vez antes de darlo por perdido.
+async function subirConReintento(nombreOriginal, buffer, subfolder) {
+  let result = await uploadToDropboxSafe(nombreOriginal, buffer, subfolder);
+  if (!result.ok) {
+    await new Promise(r => setTimeout(r, 2000));
+    result = await uploadToDropboxSafe(nombreOriginal, buffer, subfolder);
+  }
+  return result;
+}
+
 async function extraerTexto(buffer) {
   const parser = new PDFParse({ data: buffer });
   try {
@@ -46,7 +60,10 @@ async function syncOpportunityDocs(opportunity) {
     for (const archivo of archivos) {
       try {
         const buffer = await pc.descargarArchivo(cookie, archivo.rutaCompleta);
-        await uploadToDropboxSafe(archivo.nombreOriginal, buffer, subfolder);
+        const dropboxResult = await subirConReintento(archivo.nombreOriginal, buffer, subfolder);
+        if (!dropboxResult.ok) {
+          console.error(`syncOpportunityDocs: no se pudo subir "${archivo.nombreOriginal}" a Dropbox tras reintentar:`, dropboxResult.error);
+        }
 
         let textoExtraido = null;
         if (archivo.mimetype === 'application/pdf') {
@@ -69,6 +86,7 @@ async function syncOpportunityDocs(opportunity) {
           nombreOriginal: archivo.nombreOriginal,
           mimetype: archivo.mimetype,
           textoExtraido,
+          dropboxOk: dropboxResult.ok,
         });
       } catch (err) {
         console.error(`syncOpportunityDocs: no se pudo procesar el adjunto "${archivo.nombreOriginal}":`, err.message);
@@ -79,7 +97,8 @@ async function syncOpportunityDocs(opportunity) {
       `UPDATE opportunities SET documentos_pliego = $1, documentos_synced_at = now() WHERE id = $2`,
       [JSON.stringify(documentos), opportunity.id]
     );
-    return { ok: true, count: documentos.length };
+    const dropboxFailures = documentos.filter(d => !d.dropboxOk).length;
+    return { ok: true, count: documentos.length, dropboxFailures };
   } catch (err) {
     console.error(`syncOpportunityDocs: falló para la oportunidad ${opportunity.id}:`, err.message);
     return { ok: false, error: err.message };
