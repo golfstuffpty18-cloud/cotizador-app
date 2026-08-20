@@ -91,9 +91,12 @@ async function uploadToDropboxSafe(filename, buffer, subfolder) {
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       console.error('Dropbox upload falló:', res.status, text);
+      return { ok: false, error: `HTTP ${res.status}` };
     }
+    return { ok: true };
   } catch (err) {
     console.error('Dropbox upload falló:', err.message);
+    return { ok: false, error: err.message };
   }
 }
 

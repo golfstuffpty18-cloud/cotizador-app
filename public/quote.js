@@ -10,6 +10,29 @@ function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// La descarga del Excel es instantánea (sirve el archivo directo, no espera
+// a Dropbox), pero el respaldo a Dropbox corre en segundo plano y puede
+// tardar — si el usuario abre la copia de Dropbox antes de que termine,
+// Excel la ve a medio escribir y tira "no lo hemos encontrado". Este aviso
+// le dice cuándo ya es seguro abrirla ahí en vez de que tenga que adivinar.
+async function pollDropboxBackup(msgEl) {
+  if (!msgEl) return;
+  msgEl.textContent = '☁️ Guardando respaldo en Dropbox…';
+  const start = Date.now();
+  while (Date.now() - start < 60000) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(`/api/opportunities/${oppId}/dropbox-backup-status`);
+      const data = await res.json();
+      if (data.status === 'done') { msgEl.textContent = '✅ Respaldado en Dropbox — ya puedes abrirlo ahí.'; return; }
+      if (data.status === 'error') { msgEl.textContent = '⚠️ No se pudo respaldar en Dropbox. Usa la copia que se descargó a tu computadora.'; return; }
+    } catch (err) {
+      // sigue reintentando hasta el límite de 60s
+    }
+  }
+  msgEl.textContent = '⚠️ El respaldo en Dropbox está tardando más de lo normal. Usa la copia que se descargó a tu computadora.';
+}
+
 async function load() {
   if (!oppId) { app.innerHTML = '<p>Falta el ID de la oportunidad.</p>'; return; }
 
@@ -68,8 +91,9 @@ function render(opp, quote) {
       <p style="font-size:.82rem;color:var(--gray-600);margin-top:0">
         Trae los ítems del proceso con espacio para que definas tu precio unitario final.
       </p>
-      <a class="btn btn-ghost" style="display:block;text-align:center;text-decoration:none;line-height:1.6"
+      <a class="btn btn-ghost" id="linkDescargarExcel" style="display:block;text-align:center;text-decoration:none;line-height:1.6"
          href="/api/opportunities/${oppId}/quote/excel">⬇ Descargar Excel</a>
+      <div id="dropboxBackupMsg" style="font-size:.76rem;color:var(--gray-400);margin-top:6px"></div>
     </section>
 
     <section>
@@ -115,6 +139,10 @@ function render(opp, quote) {
   };
   if (btnConvencional) btnConvencional.addEventListener('click', () => setTecnologia('Convencional'));
   if (btnDireccionable) btnDireccionable.addEventListener('click', () => setTecnologia('Direccionable'));
+
+  const linkDescargarExcel = document.getElementById('linkDescargarExcel');
+  const dropboxBackupMsg = document.getElementById('dropboxBackupMsg');
+  if (linkDescargarExcel) linkDescargarExcel.addEventListener('click', () => pollDropboxBackup(dropboxBackupMsg));
 
   const btnSyncDocs = document.getElementById('btnSyncDocs');
   const syncDocsMsg = document.getElementById('syncDocsMsg');

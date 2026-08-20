@@ -30,6 +30,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // un Excel — límite aparte para no tener que subir el de las demás rutas.
 const uploadFactura = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
+// Estado del respaldo a Dropbox del Excel de cada oportunidad ('uploading'/
+// 'done'/'error'), en memoria — el proceso solo corre en una instancia, así
+// que no hace falta persistirlo. Sirve para que el frontend avise cuándo ya
+// es seguro abrir la copia de Dropbox, en vez de que el usuario adivine y se
+// tope con el "no lo hemos encontrado" de Excel por abrirla a medio subir.
+const dropboxBackupStatus = new Map();
+
 // Límite por defecto de Express es 100kb — muy chico para el POST de
 // confirmación de /api/finanzas, que manda la foto/PDF de la factura
 // codificada en base64 dentro del JSON (base64 pesa ~33% más que el
@@ -272,10 +279,19 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
   const dropboxSubfolder = dropboxSubfolderFor(opportunity);
-  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer, dropboxSubfolder); // respaldo best-effort, no bloquea la descarga
+  // Respaldo best-effort, no bloquea la descarga real (el usuario la necesita
+  // ya) — pero se trackea en dropboxBackupStatus para que el frontend pueda
+  // avisar cuándo es seguro abrir la copia de Dropbox en vez de adivinar.
+  dropboxBackupStatus.set(oppId, { status: 'uploading' });
+  uploadToDropboxSafe(`${opportunity.title} - ${opportunity.act_number}.xlsx`, buffer, dropboxSubfolder)
+    .then(result => dropboxBackupStatus.set(oppId, result.ok ? { status: 'done' } : { status: 'error', error: result.error }));
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${oppId}.xlsx"`);
   res.send(buffer);
+});
+
+app.get('/api/opportunities/:id/dropbox-backup-status', (req, res) => {
+  res.json(dropboxBackupStatus.get(req.params.id) || { status: 'idle' });
 });
 
 app.post('/api/opportunities/:id/quote/upload', upload.single('file'), async (req, res) => {
