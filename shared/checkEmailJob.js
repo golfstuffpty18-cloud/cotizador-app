@@ -1,11 +1,11 @@
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const webpush = require('web-push');
 const { pool, init, cleanupExpired, isActProcessed, markActProcessed, hasBeenAlerted, markAlerted } = require('./db');
 const { upsertOpportunity } = require('./opportunities');
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
 const { parseDeadline, parseWindowStart } = require('./parseWindow');
+const { sendPushToAll, notifySubscribers } = require('./push');
 
 const SUBJECT_RE = /Solicitud de cotizaci[oó]n en l[ií]nea\s*-\s*([\w-]+)/i;
 const ENTITY_RE = /entidad\s+([\s\S]+?)\s*,\s*ha publicado/i;
@@ -99,34 +99,6 @@ async function insertPlaceholderOpportunity(e) {
   );
 }
 
-// Devuelve el detalle por suscriptor (ok/error) además de enviar el push,
-// para poder diagnosticar fallos de entrega sin depender de los logs de Render.
-async function sendPushToAll(payload) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:d.sanchezv@gstechnologiespty.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-
-  const { rows: subs } = await pool.query('SELECT * FROM push_subscriptions');
-  const results = [];
-  for (const sub of subs) {
-    const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
-    try {
-      await webpush.sendNotification(subscription, payload, { urgency: 'high', TTL: 3600 });
-      results.push({ id: sub.id, ok: true });
-    } catch (err) {
-      results.push({ id: sub.id, ok: false, statusCode: err.statusCode, error: err.message });
-      if (err.statusCode === 404 || err.statusCode === 410) {
-        await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint]);
-      } else {
-        console.error('Push error:', err.message);
-      }
-    }
-  }
-  return results;
-}
-
 async function notifyImmediateAlert(e) {
   const bodyLines = [];
   if (e.entityFromEmail) bodyLines.push(e.entityFromEmail);
@@ -136,16 +108,6 @@ async function notifyImmediateAlert(e) {
   const payload = JSON.stringify({
     title: `📩 Nueva solicitud: ${e.actNumber}`,
     body: bodyLines.join('\n'),
-    url: '/',
-  });
-  await sendPushToAll(payload);
-}
-
-async function notifySubscribers(op) {
-  const icon = op.recommendation === 'participar' ? '✅' : op.recommendation === 'no_participar' ? '⛔' : '🔎';
-  const payload = JSON.stringify({
-    title: `${icon} ${op.actNumber}`,
-    body: `${op.title}\n${op.entity} — B/. ${op.referencePrice ?? '?'}\nRecomendación: ${op.recommendation.replace('_', ' ')}`,
     url: '/',
   });
   await sendPushToAll(payload);
@@ -291,4 +253,4 @@ async function runCheckEmailJobInner(push) {
   return { ok: true, emailsFound: emails.length, alerted, newActs: newActNumbers.length, saved, deleted };
 }
 
-module.exports = { runCheckEmailJob, sendPushToAll };
+module.exports = { runCheckEmailJob };

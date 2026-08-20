@@ -14,8 +14,9 @@ const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
-const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
-const { searchOpenByCategory, searchCompraMenor } = require('../shared/searchPanamaCompra');
+const { runCheckEmailJob } = require('../shared/checkEmailJob');
+const { sendPushToAll } = require('../shared/push');
+const { searchOpenByCategory, searchCompraMenor, runSearchJob } = require('../shared/searchPanamaCompra');
 const { uploadToDropboxSafe, dropboxSubfolderFor } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
@@ -381,6 +382,25 @@ app.all('/api/cron/check-email', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Error en /api/cron/check-email:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Camino principal para detectar oportunidades: busca directo en
+// PanamaCompra por rubro (Cotización en línea + Compra Menor), sin depender
+// del correo/IMAP. Pensado para dispararse solo con un cron externo
+// (cron-job.org), igual que /api/cron/check-email, para que las pantallas ya
+// tengan lo del día sin tener que presionar los íconos de buscar a mano.
+app.all('/api/cron/search-panamacompra', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+  try {
+    const result = await runSearchJob();
+    res.json(result);
+  } catch (err) {
+    console.error('Error en /api/cron/search-panamacompra:', err);
     res.status(500).json({ error: err.message });
   }
 });

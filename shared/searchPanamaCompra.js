@@ -1,8 +1,9 @@
 const pc = require('./panamacompra');
 const { evaluate } = require('./evaluate');
 const { parseDeadline, parseWindowStart } = require('./parseWindow');
-const { isActProcessed, markActProcessed } = require('./db');
+const { isActProcessed, markActProcessed, cleanupExpired } = require('./db');
 const { upsertOpportunity } = require('./opportunities');
+const { notifySubscribers } = require('./push');
 
 // Tope de detalles (verPliego) a consultar POR ESTADO, para no tardar
 // demasiado ni golpear la API de PanamaCompra si un día hay muchas
@@ -67,6 +68,7 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
     const row = await upsertOpportunity(op);
     if (row) {
       await markActProcessed(actNumber);
+      await notifySubscribers(row);
       nuevas.push(row);
     }
   }
@@ -85,7 +87,6 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
 // "Programadas" — son dos renglones de búsqueda distintos en PanamaCompra y
 // se reportan por separado (no se mezclan en un solo resultado), aunque
 // ambas terminen guardándose en el mismo listado de oportunidades.
-// Complementa al chequeo de correo — no lo reemplaza.
 async function searchOpenByCategory() {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
   const abiertas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.ABIERTA, 'Abiertas');
@@ -109,4 +110,43 @@ async function searchCompraMenor(precioMin = 10000, precioMax = 50000) {
   return { vigentes };
 }
 
-module.exports = { searchOpenByCategory, searchCompraMenor };
+// Tope duro + candado, mismo patrón que runCheckEmailJob en checkEmailJob.js
+// — sin esto, si PanamaCompra responde lento en un ciclo, el siguiente
+// disparo del cron externo se solaparía con el anterior en vez de esperar.
+const JOB_TIMEOUT_MS = 120000;
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Tiempo de espera agotado (${ms / 1000}s) en: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+let running = false;
+
+// Corre la búsqueda directa completa (Cotización en línea + Compra Menor) en
+// un solo ciclo, para que un único cron externo cubra ambas pantallas sin
+// depender de que alguien presione los botones de búsqueda a mano. Se
+// llaman en secuencia, no en paralelo — dos login() simultáneos contra
+// PanamaCompra con el mismo usuario podrían invalidarse la sesión entre sí.
+async function runSearchJob() {
+  if (running) return { skipped: true, reason: 'ya hay una búsqueda en curso' };
+  running = true;
+  try {
+    return await withTimeout(runSearchJobInner(), JOB_TIMEOUT_MS, 'búsqueda directa completa');
+  } catch (err) {
+    return { ok: false, error: err.message };
+  } finally {
+    running = false;
+  }
+}
+
+async function runSearchJobInner() {
+  const deleted = await cleanupExpired();
+  const enLinea = await searchOpenByCategory();
+  const compraMenor = await searchCompraMenor();
+  return { ok: true, deleted, enLinea, compraMenor };
+}
+
+module.exports = { searchOpenByCategory, searchCompraMenor, runSearchJob };
