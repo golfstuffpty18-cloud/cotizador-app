@@ -16,7 +16,7 @@ const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = requi
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
 const { runCheckEmailJob, sendPushToAll } = require('../shared/checkEmailJob');
 const { searchOpenByCategory, searchCompraMenor } = require('../shared/searchPanamaCompra');
-const { uploadToDropboxSafe } = require('../shared/dropboxUpload');
+const { uploadToDropboxSafe, dropboxSubfolderFor } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
 const { extractInvoiceData } = require('../shared/claudeInvoice');
@@ -221,18 +221,6 @@ function computeTotals(items) {
   const itbm = Math.round(subtotal * 0.07 * 100) / 100;
   const total = Math.round((subtotal + itbm) * 100) / 100;
   return { subtotal, itbm, total };
-}
-
-// Antes esto era solo `opportunity.entity || opportunity.title`, así que
-// cuando una misma institución tenía varias cotizaciones (procesos
-// distintos), todas caían juntas en una sola carpeta de Dropbox. Ahora anida
-// una subcarpeta por proyecto (título + # de acto, igual que ya se usa en el
-// nombre del archivo) dentro de la carpeta de la institución, para que cada
-// proceso quede separado sin perder el agrupamiento por institución.
-function dropboxSubfolderFor(opportunity) {
-  if (opportunity.decision !== 'participar') return undefined;
-  const proyecto = `${opportunity.title} - ${opportunity.act_number}`;
-  return opportunity.entity ? `${opportunity.entity}/${proyecto}` : proyecto;
 }
 
 async function saveDraft(oppId, data) {

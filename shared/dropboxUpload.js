@@ -97,4 +97,15 @@ async function uploadToDropboxSafe(filename, buffer, subfolder) {
   }
 }
 
-module.exports = { uploadToDropboxSafe };
+// Subcarpeta de Dropbox para todo lo que pertenece a un proceso: el
+// Excel/PDF de la cotización que genera la app Y los documentos adjuntos que
+// bajamos del pliego de PanamaCompra (syncOpportunityDocs) — comparten
+// exactamente esta función para que ambos caigan en la misma carpeta y no en
+// dos carpetas separadas para la misma oportunidad.
+function dropboxSubfolderFor(opportunity) {
+  if (opportunity.decision !== 'participar') return undefined;
+  const proyecto = `${opportunity.title} - ${opportunity.act_number}`;
+  return opportunity.entity ? `${opportunity.entity}/${proyecto}` : proyecto;
+}
+
+module.exports = { uploadToDropboxSafe, dropboxSubfolderFor };

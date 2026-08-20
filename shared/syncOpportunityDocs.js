@@ -1,6 +1,6 @@
 const { PDFParse } = require('pdf-parse');
 const pc = require('./panamacompra');
-const { uploadToDropboxSafe } = require('./dropboxUpload');
+const { uploadToDropboxSafe, dropboxSubfolderFor } = require('./dropboxUpload');
 const { pool } = require('./db');
 
 const MAX_TEXTO_CHARS = 20000;
@@ -17,8 +17,9 @@ async function extraerTexto(buffer) {
 
 // Trae los documentos adjuntos reales del acto de PanamaCompra (pliego,
 // especificaciones técnicas, términos de referencia, etc.), los sube a la
-// subcarpeta de Dropbox del cliente/institución, extrae el texto de los PDF
-// y guarda todo en opportunities.documentos_pliego. Nunca lanza: es un
+// misma subcarpeta de Dropbox donde cae el Excel/PDF de la cotización,
+// extrae el texto de los PDF y guarda todo en opportunities.documentos_pliego.
+// Nunca lanza: es un
 // respaldo/enriquecimiento secundario, igual que uploadToDropboxSafe — un
 // fallo acá no debe romper el flujo de decisión de la oportunidad.
 async function syncOpportunityDocs(opportunity) {
@@ -37,7 +38,10 @@ async function syncOpportunityDocs(opportunity) {
     // correcta según el tipo de proceso.
     const { archivos } = await pc.verPliego(cookie, registros[0].idProcesosContratacionFlujos, registros[0].idTipoProceso);
 
-    const subfolder = opportunity.entity || opportunity.title;
+    // Misma carpeta que el Excel/PDF de la cotización (dropboxSubfolderFor),
+    // para que los adjuntos del acto y la cotización generada queden juntos
+    // en vez de en dos carpetas separadas para la misma oportunidad.
+    const subfolder = dropboxSubfolderFor(opportunity);
     const documentos = [];
     for (const archivo of archivos) {
       try {
