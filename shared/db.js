@@ -146,6 +146,10 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS documentos_synced_at TIMESTAM
 -- quedan en NULL y se ven en la pantalla principal.
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS pc_estado TEXT;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS window_start TIMESTAMPTZ;
+-- 'cotizacion_linea' o 'compra_menor' — separa las dos pantallas de
+-- oportunidades de PanamaCompra (antes vivían juntas en la pantalla
+-- principal). NULL para filas de otro source (ej. 'directo').
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS tipo_proceso TEXT;
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS subcategoria TEXT;
 `;
 
@@ -163,6 +167,22 @@ async function init() {
   await backfillDeadlines();
   await backfillWindowStarts();
   await backfillProcessedActs();
+  await backfillTipoProceso();
+}
+
+// El número de acto de PanamaCompra ya trae el tipo de proceso codificado
+// (ej. "...-CL-064285" = Cotización en línea, "...-CM-000572" = Compra
+// Menor) — se usa solo para completar filas viejas que se guardaron antes de
+// que existiera esta columna; de aquí en adelante cada punto de guardado
+// (búsqueda por rubro, chequeo de correo) lo manda explícito según el
+// idTipoProceso real con el que encontró el acto en PanamaCompra.
+async function backfillTipoProceso() {
+  const { rowCount } = await pool.query(`
+    UPDATE opportunities
+    SET tipo_proceso = CASE WHEN act_number LIKE '%-CM-%' THEN 'compra_menor' ELSE 'cotizacion_linea' END
+    WHERE tipo_proceso IS NULL AND source = 'panamacompra'
+  `);
+  return rowCount;
 }
 
 // Registra en processed_acts cualquier act_number que ya exista en

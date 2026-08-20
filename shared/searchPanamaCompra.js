@@ -61,6 +61,7 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
       recommendation: ev.recommendation,
       reasoning: ev.reasoning,
       pcEstado: LABEL_TO_PC_ESTADO[label] || null,
+      tipoProceso: pc.tipoProcesoLabel(idTipoProceso),
     };
 
     const row = await upsertOpportunity(op);

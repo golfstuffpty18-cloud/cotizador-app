@@ -107,14 +107,23 @@ app.get('/api/opportunities', async (req, res) => {
   const source = req.query.source || 'panamacompra';
   const vista = req.query.vista === 'programadas' ? 'programadas' : 'hoy';
   const condicionVista = vista === 'programadas' ? ES_PROGRAMADA_SQL : `NOT ${ES_PROGRAMADA_SQL}`;
+  // 'cotizacion_linea'/'compra_menor' separan las pantallas de Cotización en
+  // línea y Compra Menor, que antes vivían juntas en la misma lista.
+  const params = [source];
+  let condicionTipo = '';
+  if (req.query.tipo === 'cotizacion_linea' || req.query.tipo === 'compra_menor') {
+    params.push(req.query.tipo);
+    condicionTipo = `AND tipo_proceso = $${params.length}`;
+  }
   const { rows } = await pool.query(
     `SELECT * FROM opportunities
      WHERE (deadline IS NULL OR deadline > now())
        AND decision != 'no_participar'
        AND source = $1
        AND ${condicionVista}
+       ${condicionTipo}
      ORDER BY created_at DESC LIMIT 100`,
-    [source]
+    params
   );
   res.json(rows);
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cotización en línea | GS Technologies and Security Solutions</title>
+<title>Compra Menor | GS Technologies and Security Solutions</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/icon-192.png">
 <meta name="theme-color" content="#0a0a1a">
@@ -21,33 +21,18 @@
     background: var(--navy); color:#fff; padding:18px 20px;
     display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10;
   }
-  header img{ width:36px; height:36px; border-radius:8px; }
+  header a.back{ color:#fff; text-decoration:none; font-size:1.2rem; }
   header h1{ font-size:1rem; margin:0; font-weight:700; }
   header p{ margin:0; font-size:.72rem; color:rgba(255,255,255,.6); }
 
-  .quick-actions{
-    display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
-    margin:14px 16px 4px; max-width:640px; margin-left:auto; margin-right:auto;
-    padding-left:14px; padding-right:14px;
-  }
-  .qa-btn{
-    display:flex; flex-direction:column; align-items:center; gap:6px;
-    padding:14px 6px; border-radius:14px; background:#fff; text-decoration:none;
-    color:var(--navy); box-shadow:0 10px 24px -16px rgba(10,10,26,.25);
-  }
-  .qa-icon{ font-size:1.7rem; }
-  .qa-label{ font-size:.68rem; font-weight:700; }
+  main{ padding:14px 14px 40px; max-width:640px; margin:0 auto; }
 
-  #enableBtn{
-    margin:14px 16px; padding:12px 16px; border-radius:12px; border:2px solid transparent;
-    background:var(--blue); color:#fff; font-weight:700; font-size:.9rem; width:calc(100% - 32px);
-  }
-  #enableBtn.active{
-    background:#fff; color:#1fa971; border-color:#1fa971;
+  #searchBtn{
+    display:block; width:100%; text-align:center; padding:12px 16px; border-radius:12px;
+    border:none; background:var(--blue); color:#fff; font-weight:700; font-size:.9rem; cursor:pointer; margin-bottom:6px;
   }
   #status{ text-align:center; font-size:.8rem; color:var(--gray-600); margin:6px 0 14px; }
 
-  main{ padding:0 14px 40px; max-width:640px; margin:0 auto; }
   .card{
     background:#fff; border-radius:14px; padding:18px; margin-bottom:14px;
     box-shadow:0 10px 24px -16px rgba(10,10,26,.25); border-left:6px solid var(--gray-100);
@@ -55,7 +40,6 @@
   .card.participar{ border-left-color:#1fa971; }
   .card.no_participar{ border-left-color:#c0392b; }
   .card.revisar{ border-left-color:#e0a800; }
-  .card.pending-decided{ opacity:.55; }
 
   .badge{
     display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.04em;
@@ -90,42 +74,19 @@
 </head>
 <body>
 <header>
-  <img src="/icons/icon-192.png" alt="">
+  <a href="/" class="back" title="Volver">←</a>
   <div style="flex:1">
-    <h1>Cotización en línea</h1>
-    <p>Oportunidades de PanamaCompra</p>
+    <h1>Compra Menor</h1>
+    <p>$10,000 a $50,000 · Oportunidades de PanamaCompra</p>
   </div>
 </header>
 
-<nav class="quick-actions">
-  <a href="#" id="searchBtn" class="qa-btn" title="Buscar Cotización en línea por rubro">
-    <span class="qa-icon">🔍</span><span class="qa-label">Buscar</span>
-  </a>
-  <a href="/compra-menor.html" class="qa-btn" title="Compra Menor: $10,000 a $50,000">
-    <span class="qa-icon">💰</span><span class="qa-label">Compra Menor</span>
-  </a>
-  <a href="/programadas.html" class="qa-btn" title="Cotizaciones programadas (aún no oficiales)">
-    <span class="qa-icon">🗓️</span><span class="qa-label">Programadas</span>
-  </a>
-  <a href="/enviadas.html" class="qa-btn" title="Cotizaciones enviadas">
-    <span class="qa-icon">📊</span><span class="qa-label">Enviadas</span>
-  </a>
-  <a href="/directo.html" class="qa-btn" title="Cotizaciones directas (fuera de PanamaCompra)">
-    <span class="qa-icon">🧾</span><span class="qa-label">Directas</span>
-  </a>
-  <a href="/catalog.html" class="qa-btn" title="Catálogo de equipos">
-    <span class="qa-icon">📋</span><span class="qa-label">Catálogo</span>
-  </a>
-  <a href="/finanzas.html" class="qa-btn" title="Facturas de gastos y emitidas, ganancias">
-    <span class="qa-icon">💵</span><span class="qa-label">Finanzas</span>
-  </a>
-</nav>
+<main>
+  <button id="searchBtn">🔍 Buscar Compra Menor por rubro</button>
+  <div id="status"></div>
+  <div id="list"></div>
+</main>
 
-<button id="enableBtn">Activar notificaciones</button>
-<div id="status"></div>
-
-<main id="list"></main>
-
-<script src="/app.js"></script>
+<script src="/compra-menor.js"></script>
 </body>
 </html>

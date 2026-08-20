@@ -239,7 +239,12 @@ async function runCheckEmailJobInner(push) {
         }
 
         for (const r of registros) {
-          const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos);
+          // Sin pasar r.idTipoProceso, verPliego usa su default (Cotización
+          // en línea) — para un acto de Compra Menor detectado por correo
+          // (buscarProcesoCualquierEstado también busca ese tipo), la URL
+          // quedaba armada con el tipo de proceso equivocado y PanamaCompra
+          // respondía "Proceso Denegado", perdiendo el acto en silencio.
+          const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos, r.idTipoProceso);
           const referencePrice = pc.extraerPrecio(campos['Precio estimado']);
           const title = campos['Título'] || r.titulo;
           const entity = campos['Entidad'] || '';
@@ -261,6 +266,7 @@ async function runCheckEmailJobInner(push) {
             reasoning: ev.reasoning,
             emailUid: e.uid,
             pcEstado,
+            tipoProceso: pc.tipoProcesoLabel(r.idTipoProceso),
           };
 
           const inserted = await saveOpportunity(op);

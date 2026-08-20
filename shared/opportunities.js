@@ -16,23 +16,23 @@ async function upsertOpportunity(op) {
       `UPDATE opportunities SET
          convocatoria = $1, title = $2, entity = $3, entity_address = $4, entity_province = $5,
          reference_price = $6, window_info = $7, deadline = $8, items = $9,
-         category_match = $10, recommendation = $11, reasoning = $12, email_uid = $13, category = $14, pc_estado = $15, window_start = $16
-       WHERE id = $17 RETURNING *`,
+         category_match = $10, recommendation = $11, reasoning = $12, email_uid = $13, category = $14, pc_estado = $15, window_start = $16, tipo_proceso = $17
+       WHERE id = $18 RETURNING *`,
       [op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice,
        op.windowInfo, op.deadline, JSON.stringify(op.items || []), op.categoryMatch, op.recommendation,
-       op.reasoning, op.emailUid ?? null, op.category ?? null, op.pcEstado ?? null, op.windowStart ?? null, placeholder[0].id]
+       op.reasoning, op.emailUid ?? null, op.category ?? null, op.pcEstado ?? null, op.windowStart ?? null, op.tipoProceso ?? null, placeholder[0].id]
     );
     return rows[0];
   }
 
   const { rows } = await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid, category, pc_estado, window_start)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14,$15,$16,$17)
+      (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid, category, pc_estado, window_start, tipo_proceso)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14,$15,$16,$17,$18)
      ON CONFLICT (act_number, convocatoria) DO NOTHING
      RETURNING *`,
     [op.actNumber, op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice, op.windowInfo, op.deadline,
-     JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid ?? null, op.category ?? null, op.pcEstado ?? null, op.windowStart ?? null]
+     JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid ?? null, op.category ?? null, op.pcEstado ?? null, op.windowStart ?? null, op.tipoProceso ?? null]
   );
   return rows[0] || null;
 }

@@ -226,6 +226,13 @@ async function descargarArchivo(cookie, rutaCompleta) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Nombre que usa la app para cada tipo de proceso (pantallas separadas:
+// "Cotización en línea" y "Compra Menor"). Centralizado acá para que
+// searchPanamaCompra.js y checkEmailJob.js no dupliquen el mismo mapeo.
+function tipoProcesoLabel(idTipoProceso) {
+  return idTipoProceso === TIPO_PROCESO_COMPRA_MENOR ? 'compra_menor' : 'cotizacion_linea';
+}
+
 function extraerPrecio(texto) {
   if (!texto) return null;
   const m = String(texto).replace(/,/g, '').match(/(\d+(?:\.\d+)?)/);
@@ -234,6 +241,6 @@ function extraerPrecio(texto) {
 
 module.exports = {
   login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas,
-  verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, ESTADO, TIPO_PROCESO_COTIZACION,
+  verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, tipoProcesoLabel, ESTADO, TIPO_PROCESO_COTIZACION,
   TIPO_PROCESO_COMPRA_MENOR, ESTADO_COMPRA_MENOR,
 };

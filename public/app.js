@@ -108,10 +108,6 @@ wireSearchButton('searchBtn', '/api/search/panamacompra', ({ abiertas, programad
   `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`
 );
 
-wireSearchButton('searchRangoBtn', '/api/search/rango-precio', ({ vigentes }) =>
-  `Compra Menor $10,000-$50,000 — ${vigentes.nuevas} nueva(s) de ${vigentes.candidatas} candidata(s) (${vigentes.totalConsultadas} vigentes revisadas).`
-);
-
 async function checkExistingSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
@@ -172,7 +168,7 @@ function card(op) {
 
 async function loadOpportunities() {
   const list = document.getElementById('list');
-  const res = await fetch('/api/opportunities');
+  const res = await fetch('/api/opportunities?tipo=cotizacion_linea');
   const items = await res.json();
   list.innerHTML = '';
   if (!items.length) {
