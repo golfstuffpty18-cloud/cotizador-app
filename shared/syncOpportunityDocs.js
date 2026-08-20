@@ -26,7 +26,7 @@ async function syncOpportunityDocs(opportunity) {
 
   try {
     const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-    const registros = await pc.buscarProcesoCualquierEstado(cookie, opportunity.act_number);
+    const { registros } = await pc.buscarProcesoCualquierEstado(cookie, opportunity.act_number);
     if (!registros.length) {
       console.error(`syncOpportunityDocs: no se encontró el acto ${opportunity.act_number} en PanamaCompra`);
       return;
