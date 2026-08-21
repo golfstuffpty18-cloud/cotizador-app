@@ -128,6 +128,74 @@ ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS direccion TEXT;
 ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS telefono TEXT;
 ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS correo TEXT;
 
+-- Multi-empresa (paso 1 de la migración: solo estructura, sin comportamiento
+-- nuevo todavía). companies/company_secrets/company_assets/users/sessions no
+-- las lee ni las escribe nada todavía; company_id en las tablas existentes
+-- queda nullable hasta que el paso 2 las rellene para GS Technologies.
+CREATE TABLE IF NOT EXISTS companies (
+  id SERIAL PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT true,
+  branding JSONB NOT NULL DEFAULT '{}',
+  category_keywords JSONB NOT NULL DEFAULT '{}',
+  own_company_names JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Tabla separada de companies a propósito: un SELECT * sobre companies (para
+-- listar empresas en una futura pantalla admin, por ejemplo) nunca expone
+-- credenciales por accidente. Los campos *_enc van cifrados con
+-- shared/crypto.js, no en texto plano.
+CREATE TABLE IF NOT EXISTS company_secrets (
+  company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+  pc_usuario TEXT,
+  pc_contrasena_enc TEXT,
+  dropbox_app_key TEXT,
+  dropbox_app_secret_enc TEXT,
+  dropbox_refresh_token_enc TEXT,
+  dropbox_folder TEXT,
+  imap_host TEXT,
+  imap_port INTEGER,
+  imap_user TEXT,
+  imap_password_enc TEXT
+);
+
+-- Logo/firma por empresa, guardados como blob (mismo patrón que quotes.pdf y
+-- finance_invoices.archivo) — no en disco, que en Render es efímero y se
+-- borra en cada deploy.
+CREATE TABLE IF NOT EXISTS company_assets (
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('logo','firma')),
+  mimetype TEXT,
+  data BYTEA,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (company_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner','member')),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(company_id, email)
+);
+
+-- Token opaco en base de datos, no JWT — con el volumen de esta app no vale
+-- la pena la complejidad de revocar JWT; cerrar una sesión acá es un DELETE.
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;
@@ -151,6 +219,19 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS window_start TIMESTAMPTZ;
 -- principal). NULL para filas de otro source (ej. 'directo').
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS tipo_proceso TEXT;
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS subcategoria TEXT;
+
+-- company_id nullable por ahora a propósito (paso 1 de la migración
+-- multi-empresa) — el paso 2 lo rellena para las filas existentes de GS
+-- Technologies y recién ahí se pasa a NOT NULL (paso 3). No tiene REFERENCES
+-- con ON DELETE todavía porque el objetivo es no cambiar ningún
+-- comportamiento en este paso, solo la estructura.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE processed_acts ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE email_alerts ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
 `;
 
 // Las cotizaciones directas (source='directo') no tienen fecha límite de
