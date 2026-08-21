@@ -168,8 +168,8 @@ async function runCheckEmailJobInner(push, companyId) {
   for (const e of emails) {
     if (seenForAlert.has(e.actNumber)) continue;
     seenForAlert.add(e.actNumber);
-    if (await hasBeenAlerted(e.actNumber)) continue;
-    if (await isActProcessed(e.actNumber)) continue;
+    if (await hasBeenAlerted(e.actNumber, companyId)) continue;
+    if (await isActProcessed(e.actNumber, companyId)) continue;
     await insertPlaceholderOpportunity(e, companyId);
     await notifyImmediateAlert(e);
     await markAlerted(e.actNumber, e.subject, companyId);
@@ -183,7 +183,7 @@ async function runCheckEmailJobInner(push, companyId) {
   const newActNumbers = [];
   for (const e of emails) {
     if (seenActNumbers.has(e.actNumber)) continue;
-    if (await isActProcessed(e.actNumber)) continue;
+    if (await isActProcessed(e.actNumber, companyId)) continue;
     seenActNumbers.add(e.actNumber);
     newActNumbers.push(e);
   }

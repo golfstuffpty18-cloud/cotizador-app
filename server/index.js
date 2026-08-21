@@ -822,6 +822,66 @@ app.all('/api/cron/backfill-company-id', async (req, res) => {
   }
 });
 
+// Paso 3 de la migración multi-empresa: una vez que el paso 2 ya dejó
+// company_id relleno en todas las filas, esto lo hace NOT NULL y cambia las
+// restricciones únicas/PK que hoy son globales (act_number solo) a
+// compuestas con company_id — sin esto, dos empresas nunca podrían guardar
+// el mismo número de acto de PanamaCompra aunque ninguna tenga nada que ver
+// con la otra. Se niega a correr si todavía queda algún company_id vacío.
+app.all('/api/cron/close-company-id-constraints', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+  try {
+    const tables = ['opportunities', 'push_subscriptions', 'quotes', 'processed_acts', 'email_alerts', 'catalog_items', 'finance_invoices'];
+    const nullCounts = {};
+    for (const table of tables) {
+      const { rows } = await pool.query(`SELECT COUNT(*) FROM ${table} WHERE company_id IS NULL`);
+      nullCounts[table] = Number(rows[0].count);
+    }
+    const conNulos = Object.entries(nullCounts).filter(([, c]) => c > 0);
+    if (conNulos.length) {
+      return res.status(409).json({ error: 'hay filas sin company_id, corre primero /api/cron/backfill-company-id', nullCounts });
+    }
+
+    for (const table of tables) {
+      await pool.query(`ALTER TABLE ${table} ALTER COLUMN company_id SET NOT NULL`);
+    }
+
+    // Nombres estándar que Postgres le pone solo a una UNIQUE/PK declarada
+    // sin nombre explícito (<tabla>_<columna(s)>_key / <tabla>_pkey) — así
+    // como se declararon originalmente en shared/db.js. Más simple y
+    // confiable que buscarlos en pg_constraint (que no siempre se comporta
+    // igual entre motores/herramientas).
+    // Se tira tanto el nombre viejo (primera corrida) como el nuevo (por si
+    // se vuelve a correr) — así queda seguro repetirlo cualquier cantidad de
+    // veces, igual que el resto de los ALTER TABLE de esta app.
+    await pool.query(`ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_act_number_convocatoria_key`);
+    await pool.query(`ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_company_act_convocatoria_key`);
+    await pool.query(`ALTER TABLE opportunities ADD CONSTRAINT opportunities_company_act_convocatoria_key UNIQUE (company_id, act_number, convocatoria)`);
+
+    await pool.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_endpoint_key`);
+    await pool.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_company_endpoint_key`);
+    await pool.query(`ALTER TABLE push_subscriptions ADD CONSTRAINT push_subscriptions_company_endpoint_key UNIQUE (company_id, endpoint)`);
+
+    await pool.query(`ALTER TABLE processed_acts DROP CONSTRAINT IF EXISTS processed_acts_pkey`);
+    await pool.query(`ALTER TABLE processed_acts ADD CONSTRAINT processed_acts_pkey PRIMARY KEY (company_id, act_number)`);
+
+    await pool.query(`ALTER TABLE email_alerts DROP CONSTRAINT IF EXISTS email_alerts_pkey`);
+    await pool.query(`ALTER TABLE email_alerts ADD CONSTRAINT email_alerts_pkey PRIMARY KEY (company_id, act_number)`);
+
+    for (const table of tables) {
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_${table}_company_id ON ${table}(company_id)`);
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en /api/cron/close-company-id-constraints:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Manejador de errores global: sin esto, un error atrapado por
 // express-async-errors se queda sin respuesta igual (Express solo lo saca
 // del limbo, todavía hace falta algo que le conteste al cliente).

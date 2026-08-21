@@ -314,36 +314,51 @@ async function cleanupExpired() {
   return rowCount;
 }
 
-// companyId es opcional por ahora (paso 2 de la migración multi-empresa:
-// dual-write mientras la restricción única de processed_acts sigue siendo
-// solo act_number — se endurece en el paso 3). Si se manda, también se
-// guarda/filtra por empresa; "ya procesado" hoy sigue siendo efectivamente
-// global hasta que esa restricción cambie.
-async function isActProcessed(actNumber) {
-  const { rows } = await pool.query('SELECT 1 FROM processed_acts WHERE act_number = $1', [actNumber]);
+// "Ya procesado" es por empresa, no global: si no filtrara por company_id,
+// la búsqueda de la Empresa B se saltaría actos solo porque la Empresa A ya
+// los vio, aunque a B nunca se le hubieran mostrado (bug real que este
+// filtro cierra, en conjunto con la llave primaria compuesta
+// (company_id, act_number) de processed_acts).
+async function isActProcessed(actNumber, companyId) {
+  const { rows } = await pool.query(
+    'SELECT 1 FROM processed_acts WHERE act_number = $1 AND company_id = $2',
+    [actNumber, companyId]
+  );
   return rows.length > 0;
 }
 
 async function markActProcessed(actNumber, companyId) {
+  // ON CONFLICT sigue apuntando a la restricción vieja (solo act_number) a
+  // propósito: todavía es la que existe de verdad en la base. Se actualiza a
+  // (company_id, act_number) en un cambio aparte, después de correr
+  // /api/cron/close-company-id-constraints (paso 3), que es lo que realmente
+  // cambia la restricción — desplegar los dos juntos rompería toda búsqueda
+  // hasta que ese endpoint corriera.
   await pool.query(
     'INSERT INTO processed_acts (act_number, company_id) VALUES ($1,$2) ON CONFLICT (act_number) DO NOTHING',
-    [actNumber, companyId ?? null]
+    [actNumber, companyId]
   );
 }
 
 // email_alerts: marca que ya se envió el aviso inmediato al detectar el correo,
 // independiente de si el proceso ya está publicado en el portal de PanamaCompra
 // (eso lo controla processed_acts). Así evitamos reenviar el aviso inmediato en
-// cada ciclo mientras se espera a que el portal publique el acto.
-async function hasBeenAlerted(actNumber) {
-  const { rows } = await pool.query('SELECT 1 FROM email_alerts WHERE act_number = $1', [actNumber]);
+// cada ciclo mientras se espera a que el portal publique el acto. Igual que
+// processed_acts, es por empresa, no global.
+async function hasBeenAlerted(actNumber, companyId) {
+  const { rows } = await pool.query(
+    'SELECT 1 FROM email_alerts WHERE act_number = $1 AND company_id = $2',
+    [actNumber, companyId]
+  );
   return rows.length > 0;
 }
 
 async function markAlerted(actNumber, subject, companyId) {
+  // Mismo motivo que en markActProcessed: ON CONFLICT sigue apuntando a la
+  // restricción vieja hasta correr el paso 3.
   await pool.query(
     'INSERT INTO email_alerts (act_number, subject, company_id) VALUES ($1,$2,$3) ON CONFLICT (act_number) DO NOTHING',
-    [actNumber, subject, companyId ?? null]
+    [actNumber, subject, companyId]
   );
 }
 

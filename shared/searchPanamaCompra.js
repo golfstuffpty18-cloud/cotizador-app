@@ -34,7 +34,7 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, companyId
   for (const r of candidatas) {
     if (revisadas >= MAX_DETALLES) break;
     const actNumber = r.numProceso;
-    if (await isActProcessed(actNumber)) continue; // ya lo teníamos, por correo o por una búsqueda anterior
+    if (await isActProcessed(actNumber, companyId)) continue; // ya lo teníamos, por correo o por una búsqueda anterior
     revisadas++;
 
     const { campos, items } = await pc.verPliego(cookie, r.idProcesosContratacionFlujos, idTipoProceso);
