@@ -102,4 +102,4 @@ function evaluate({ title, referencePrice }) {
   };
 }
 
-module.exports = { evaluate };
+module.exports = { evaluate, CATEGORY_KEYWORDS, EXCLUDE_KEYWORDS };

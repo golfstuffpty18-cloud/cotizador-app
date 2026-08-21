@@ -10,7 +10,9 @@ const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const { pool, init } = require('../shared/db');
 const { generateQuotePdf } = require('../shared/generateQuotePdf');
-const { generateQuoteExcel } = require('../shared/generateQuoteExcel');
+const { generateQuoteExcel, COMPANY } = require('../shared/generateQuoteExcel');
+const { CATEGORY_KEYWORDS, EXCLUDE_KEYWORDS } = require('../shared/evaluate');
+const { encryptSecret } = require('../shared/crypto');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
@@ -730,6 +732,83 @@ app.all('/api/cron/backfill-cliente-info', async (req, res) => {
   }
 
   res.json({ revisadas: rows.length, actualizadas, errores, force });
+});
+
+// Paso 2 de la migración multi-empresa: siembra la fila de GS Technologies
+// en companies/company_secrets (con los valores que hoy están quemados en
+// el código y en las variables de entorno) y rellena company_id en las 7
+// tablas existentes donde todavía esté vacío. Idempotente — correrlo de
+// nuevo no duplica la empresa ni pisa filas que ya tengan company_id.
+app.all('/api/cron/backfill-company-id', async (req, res) => {
+  const key = req.query.key || req.headers['x-cron-key'];
+  if (!process.env.CRON_SECRET || key !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'no autorizado' });
+  }
+  try {
+    const slug = 'gs-technologies';
+    const { rows: existing } = await pool.query('SELECT id FROM companies WHERE slug = $1', [slug]);
+    let companyId;
+
+    if (existing.length) {
+      companyId = existing[0].id;
+    } else {
+      const branding = {
+        nombre: COMPANY.nombre,
+        direccion: COMPANY.direccion,
+        telefono: COMPANY.telefono,
+        ruc: COMPANY.ruc,
+        correo: COMPANY.correo,
+        signer_name: 'Ing. Dionisio Sánchez',
+        signer_title: 'Representante Legal',
+        footer_text: 'Gracias por contactar los servicios de nuestra empresa. Recuerda: no vendemos equipos de seguridad, te asesoramos y realizamos tus proyectos para proteger tu hogar o negocio.',
+      };
+      const categoryKeywords = {
+        categories: Object.keys(CATEGORY_KEYWORDS),
+        keywords: CATEGORY_KEYWORDS,
+        exclude: EXCLUDE_KEYWORDS,
+      };
+      const ownCompanyNames = ['GS Technologies Investments, S.A.', 'GS Technologies and Security Solutions', 'GS Technologies'];
+
+      const { rows } = await pool.query(
+        `INSERT INTO companies (slug, name, branding, category_keywords, own_company_names)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [slug, 'GS Technologies and Security Solutions', JSON.stringify(branding), JSON.stringify(categoryKeywords), JSON.stringify(ownCompanyNames)]
+      );
+      companyId = rows[0].id;
+
+      await pool.query(
+        `INSERT INTO company_secrets
+          (company_id, pc_usuario, pc_contrasena_enc, dropbox_app_key, dropbox_app_secret_enc, dropbox_refresh_token_enc, dropbox_folder, imap_host, imap_port, imap_user, imap_password_enc)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (company_id) DO NOTHING`,
+        [
+          companyId,
+          process.env.PC_USUARIO || null,
+          encryptSecret(process.env.PC_CONTRASENA),
+          process.env.DROPBOX_APP_KEY || null,
+          encryptSecret(process.env.DROPBOX_APP_SECRET),
+          encryptSecret(process.env.DROPBOX_REFRESH_TOKEN),
+          process.env.DROPBOX_FOLDER || null,
+          process.env.IMAP_HOST || null,
+          process.env.IMAP_PORT ? Number(process.env.IMAP_PORT) : null,
+          process.env.IMAP_USER || null,
+          encryptSecret(process.env.IMAP_PASSWORD),
+        ]
+      );
+    }
+
+    const tables = ['opportunities', 'push_subscriptions', 'quotes', 'processed_acts', 'email_alerts', 'catalog_items', 'finance_invoices'];
+    const updated = {};
+    for (const table of tables) {
+      const { rowCount } = await pool.query(`UPDATE ${table} SET company_id = $1 WHERE company_id IS NULL`, [companyId]);
+      updated[table] = rowCount;
+    }
+
+    res.json({ ok: true, companyId, updated });
+  } catch (err) {
+    console.error('Error en /api/cron/backfill-company-id:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Manejador de errores global: sin esto, un error atrapado por

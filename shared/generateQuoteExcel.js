@@ -300,4 +300,4 @@ function totalLine(sheet, r, label, formula, bold, numFmt) {
   if (bold) v.border = { top: { style: 'medium', color: { argb: 'FF1616E6' } } };
 }
 
-module.exports = { generateQuoteExcel, MARKER };
+module.exports = { generateQuoteExcel, MARKER, COMPANY };
