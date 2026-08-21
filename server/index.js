@@ -13,6 +13,7 @@ const { generateQuotePdf } = require('../shared/generateQuotePdf');
 const { generateQuoteExcel, COMPANY } = require('../shared/generateQuoteExcel');
 const { CATEGORY_KEYWORDS, EXCLUDE_KEYWORDS } = require('../shared/evaluate');
 const { encryptSecret } = require('../shared/crypto');
+const { resolveCompanyId } = require('../shared/tenant');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
@@ -76,9 +77,9 @@ app.post('/api/push/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint || !sub.keys) return res.status(400).json({ error: 'suscripción inválida' });
   await pool.query(
-    `INSERT INTO push_subscriptions (endpoint, p256dh, auth) VALUES ($1,$2,$3)
+    `INSERT INTO push_subscriptions (endpoint, p256dh, auth, company_id) VALUES ($1,$2,$3,$4)
      ON CONFLICT (endpoint) DO NOTHING`,
-    [sub.endpoint, sub.keys.p256dh, sub.keys.auth]
+    [sub.endpoint, sub.keys.p256dh, sub.keys.auth, resolveCompanyId(req)]
   );
   res.json({ ok: true });
 });
@@ -112,7 +113,7 @@ app.get('/api/opportunities', async (req, res) => {
   const condicionVista = vista === 'programadas' ? ES_PROGRAMADA_SQL : `NOT ${ES_PROGRAMADA_SQL}`;
   // 'cotizacion_linea'/'compra_menor' separan las pantallas de Cotización en
   // línea y Compra Menor, que antes vivían juntas en la misma lista.
-  const params = [source];
+  const params = [source, resolveCompanyId(req)];
   let condicionTipo = '';
   if (req.query.tipo === 'cotizacion_linea' || req.query.tipo === 'compra_menor') {
     params.push(req.query.tipo);
@@ -123,6 +124,7 @@ app.get('/api/opportunities', async (req, res) => {
      WHERE (deadline IS NULL OR deadline > now())
        AND decision != 'no_participar'
        AND source = $1
+       AND company_id = $2
        AND ${condicionVista}
        ${condicionTipo}
      ORDER BY created_at DESC LIMIT 100`,
@@ -151,10 +153,10 @@ app.post('/api/opportunities/directo', async (req, res) => {
 
   const { rows } = await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, items, category, category_match, recommendation, reasoning, decision, source)
-     VALUES ($1,'1',$2,$2,$3,$4,true,'participar','Cotización directa con cliente (fuera de PanamaCompra).','participar','directo')
+      (act_number, convocatoria, title, entity, items, category, category_match, recommendation, reasoning, decision, source, company_id)
+     VALUES ($1,'1',$2,$2,$3,$4,true,'participar','Cotización directa con cliente (fuera de PanamaCompra).','participar','directo',$5)
      RETURNING *`,
-    [`DIRECTO-${Date.now()}`, titulo, JSON.stringify(normalizedItems), categoria]
+    [`DIRECTO-${Date.now()}`, titulo, JSON.stringify(normalizedItems), categoria, resolveCompanyId(req)]
   );
   res.json(rows[0]);
 });
@@ -251,9 +253,12 @@ async function saveDraft(oppId, data) {
   const safeItems = Array.isArray(items) ? items : [];
   const { subtotal, itbm, total } = computeTotals(safeItems);
 
+  // company_id se deriva de la propia oportunidad (subquery), no se recibe
+  // por parámetro — así es imposible que quotes.company_id quede
+  // desalineado del de opportunities.company_id.
   const { rows } = await pool.query(
-    `INSERT INTO quotes (opportunity_id, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items, subtotal, itbm, total, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+    `INSERT INTO quotes (opportunity_id, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items, subtotal, itbm, total, updated_at, company_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), (SELECT company_id FROM opportunities WHERE id = $1))
      ON CONFLICT (opportunity_id) DO UPDATE SET
        cliente_nombre = EXCLUDED.cliente_nombre,
        cliente_ruc = EXCLUDED.cliente_ruc,
@@ -290,7 +295,7 @@ app.get('/api/opportunities/:id/quote/excel', async (req, res) => {
 
   const opportunity = oppRows[0];
   const baseItems = (quote && quote.items && quote.items.length) ? quote.items : (opportunity.items || []);
-  const suggestedItems = await suggestPricesForItems(baseItems, opportunity.category, opportunity.tecnologia_incendio);
+  const suggestedItems = await suggestPricesForItems(baseItems, opportunity.category, opportunity.tecnologia_incendio, opportunity.company_id);
   const effectiveQuote = quote ? { ...quote, items: suggestedItems } : { items: suggestedItems };
 
   const buffer = await generateQuoteExcel({ opportunity, quote: effectiveQuote });
@@ -362,7 +367,7 @@ app.post('/api/opportunities/:id/quote/approve', async (req, res) => {
   );
 
   try {
-    await upsertFromQuoteItems(quote.items || []);
+    await upsertFromQuoteItems(quote.items || [], {}, opportunity.company_id);
   } catch (err) {
     console.error('No se pudo actualizar el catálogo:', err.message);
   }
@@ -384,7 +389,7 @@ app.all('/api/cron/check-email', async (req, res) => {
     return res.status(401).json({ error: 'no autorizado' });
   }
   try {
-    const result = await runCheckEmailJob();
+    const result = await runCheckEmailJob(resolveCompanyId(req));
     res.json(result);
   } catch (err) {
     console.error('Error en /api/cron/check-email:', err);
@@ -403,7 +408,7 @@ app.all('/api/cron/search-panamacompra', async (req, res) => {
     return res.status(401).json({ error: 'no autorizado' });
   }
   try {
-    const result = await runSearchJob();
+    const result = await runSearchJob(resolveCompanyId(req));
     res.json(result);
   } catch (err) {
     console.error('Error en /api/cron/search-panamacompra:', err);
@@ -422,7 +427,7 @@ app.get('/api/enviadas/:idProcesosContratacionFlujos/cuadro', async (req, res) =
 
 app.post('/api/search/panamacompra', async (req, res) => {
   try {
-    const result = await searchOpenByCategory();
+    const result = await searchOpenByCategory(resolveCompanyId(req));
     res.json(result);
   } catch (err) {
     console.error('Error en búsqueda manual de PanamaCompra:', err.message);
@@ -431,7 +436,7 @@ app.post('/api/search/panamacompra', async (req, res) => {
 });
 
 app.post('/api/search/rango-precio', async (req, res) => {
-  res.json(await searchCompraMenor());
+  res.json(await searchCompraMenor(resolveCompanyId(req)));
 });
 
 app.all('/api/cron/test-push', async (req, res) => {
@@ -473,18 +478,18 @@ app.post('/api/catalog/import', upload.single('file'), async (req, res) => {
   }
 
   const defaultCategoria = (req.body && req.body.categoria) || (req.query && req.query.categoria) || null;
-  const resumen = await importCatalogRows(parsed.rows, { defaultCategoria });
+  const resumen = await importCatalogRows(parsed.rows, { defaultCategoria }, resolveCompanyId(req));
   res.json({ ok: true, ...resumen });
 });
 
 app.get('/api/catalog', async (req, res) => {
   const { categoria, search } = req.query;
   const clauses = [];
-  const params = [];
+  const params = [resolveCompanyId(req)];
   if (categoria) { params.push(categoria); clauses.push(`categoria = $${params.length}`); }
   if (search) { params.push(`%${search}%`); clauses.push(`descripcion ILIKE $${params.length}`); }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const { rows } = await pool.query(`SELECT * FROM catalog_items ${where} ORDER BY updated_at DESC LIMIT 300`, params);
+  const where = ['company_id = $1', ...clauses].join(' AND ');
+  const { rows } = await pool.query(`SELECT * FROM catalog_items WHERE ${where} ORDER BY updated_at DESC LIMIT 300`, params);
   res.json(rows);
 });
 
@@ -492,9 +497,9 @@ app.post('/api/catalog', async (req, res) => {
   const { descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas } = req.body || {};
   if (!descripcion) return res.status(400).json({ error: 'falta descripción' });
   const { rows } = await pool.query(
-    `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas, fecha_cotizacion)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now()) RETURNING *`,
-    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null]
+    `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, margen_g, proveedor, notas, fecha_cotizacion, company_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), $10) RETURNING *`,
+    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, resolveCompanyId(req)]
   );
   res.json(rows[0]);
 });
@@ -505,15 +510,15 @@ app.put('/api/catalog/:id', async (req, res) => {
     `UPDATE catalog_items SET
        descripcion = COALESCE($1, descripcion), categoria = $2, subcategoria = $3, marca = $4, modelo = $5,
        costo_distribuidor = $6, margen_g = $7, proveedor = $8, notas = $9, updated_at = now()
-     WHERE id = $10 RETURNING *`,
-    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, req.params.id]
+     WHERE id = $10 AND company_id = $11 RETURNING *`,
+    [descripcion, categoria || null, subcategoria || null, marca || null, modelo || null, costo_distribuidor || null, margen_g || null, proveedor || null, notas || null, req.params.id, resolveCompanyId(req)]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
 });
 
 app.delete('/api/catalog/:id', async (req, res) => {
-  await pool.query('DELETE FROM catalog_items WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM catalog_items WHERE id = $1 AND company_id = $2', [req.params.id, resolveCompanyId(req)]);
   res.json({ ok: true });
 });
 
@@ -542,15 +547,15 @@ app.post('/api/finanzas/extraer', uploadFactura.single('file'), async (req, res)
 app.get('/api/finanzas', async (req, res) => {
   const { tipo, anio, mes, proyecto } = req.query;
   const clauses = [];
-  const params = [];
+  const params = [resolveCompanyId(req)];
   if (tipo) { params.push(tipo); clauses.push(`tipo = $${params.length}`); }
   if (proyecto) { params.push(proyecto); clauses.push(`proyecto = $${params.length}`); }
   if (anio) { params.push(anio); clauses.push(`EXTRACT(YEAR FROM fecha) = $${params.length}`); }
   if (mes) { params.push(mes); clauses.push(`EXTRACT(MONTH FROM fecha) = $${params.length}`); }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const where = ['company_id = $1', ...clauses].join(' AND ');
   const { rows } = await pool.query(
     `SELECT id, tipo, contraparte, ruc, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at
-     FROM finance_invoices ${where} ORDER BY fecha DESC NULLS LAST, created_at DESC LIMIT 500`,
+     FROM finance_invoices WHERE ${where} ORDER BY fecha DESC NULLS LAST, created_at DESC LIMIT 500`,
     params
   );
   res.json(rows);
@@ -558,7 +563,8 @@ app.get('/api/finanzas', async (req, res) => {
 
 app.get('/api/finanzas/proyectos', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT DISTINCT proyecto FROM finance_invoices WHERE proyecto IS NOT NULL AND proyecto != '' ORDER BY proyecto`
+    `SELECT DISTINCT proyecto FROM finance_invoices WHERE proyecto IS NOT NULL AND proyecto != '' AND company_id = $1 ORDER BY proyecto`,
+    [resolveCompanyId(req)]
   );
   res.json(rows.map((r) => r.proyecto));
 });
@@ -569,13 +575,15 @@ app.get('/api/finanzas/proyectos', async (req, res) => {
 // una FK a opportunities).
 app.get('/api/finanzas/resumen', async (req, res) => {
   const anio = req.query.anio || new Date().getFullYear();
+  const companyId = resolveCompanyId(req);
   const { rows: porAnio } = await pool.query(
-    `SELECT tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices WHERE EXTRACT(YEAR FROM fecha) = $1 GROUP BY tipo`,
-    [anio]
+    `SELECT tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices WHERE EXTRACT(YEAR FROM fecha) = $1 AND company_id = $2 GROUP BY tipo`,
+    [anio, companyId]
   );
   const { rows: porProyecto } = await pool.query(
     `SELECT proyecto, tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices
-     WHERE proyecto IS NOT NULL AND proyecto != '' GROUP BY proyecto, tipo ORDER BY proyecto`
+     WHERE proyecto IS NOT NULL AND proyecto != '' AND company_id = $1 GROUP BY proyecto, tipo ORDER BY proyecto`,
+    [companyId]
   );
 
   const totales = { emitida: 0, gasto: 0 };
@@ -600,8 +608,8 @@ app.get('/api/finanzas/resumen', async (req, res) => {
 app.get('/api/finanzas/:id', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, created_at
-     FROM finance_invoices WHERE id = $1`,
-    [req.params.id]
+     FROM finance_invoices WHERE id = $1 AND company_id = $2`,
+    [req.params.id, resolveCompanyId(req)]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
@@ -609,8 +617,8 @@ app.get('/api/finanzas/:id', async (req, res) => {
 
 app.get('/api/finanzas/:id/archivo', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT archivo, archivo_tipo, archivo_nombre FROM finance_invoices WHERE id = $1`,
-    [req.params.id]
+    `SELECT archivo, archivo_tipo, archivo_nombre FROM finance_invoices WHERE id = $1 AND company_id = $2`,
+    [req.params.id, resolveCompanyId(req)]
   );
   if (!rows.length || !rows[0].archivo) return res.status(404).send('no encontrado');
   res.set('Content-Type', rows[0].archivo_tipo || 'application/octet-stream');
@@ -632,11 +640,13 @@ app.post('/api/finanzas', async (req, res) => {
   // re-subir por error una foto ya procesada. El usuario confirma a
   // propósito con confirmar_duplicado=true si de verdad quiere guardarla
   // igual (ej. una nota de crédito con el mismo número que la original).
+  const companyId = resolveCompanyId(req);
+
   if (numero_factura && contraparte && !confirmar_duplicado) {
     const { rows: existentes } = await pool.query(
       `SELECT id, tipo, contraparte, numero_factura, fecha, total FROM finance_invoices
-       WHERE LOWER(numero_factura) = LOWER($1) AND LOWER(contraparte) = LOWER($2)`,
-      [numero_factura, contraparte]
+       WHERE LOWER(numero_factura) = LOWER($1) AND LOWER(contraparte) = LOWER($2) AND company_id = $3`,
+      [numero_factura, contraparte, companyId]
     );
     if (existentes.length) return res.status(409).json({ duplicado: true, existentes });
   }
@@ -645,8 +655,8 @@ app.post('/api/finanzas', async (req, res) => {
 
   const { rows } = await pool.query(
     `INSERT INTO finance_invoices
-       (tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, archivo, datos_extraidos)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       (tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, items, notas, archivo_nombre, archivo_tipo, archivo, datos_extraidos, company_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
     [
       tipo, contraparte || null, ruc || null, direccion || null, telefono || null, correo || null, numero_factura || null, fecha || null,
@@ -654,6 +664,7 @@ app.post('/api/finanzas', async (req, res) => {
       items ? JSON.stringify(items) : null, notas || null,
       archivo_nombre || null, archivo_tipo || null, archivoBuffer,
       datos_extraidos ? JSON.stringify(datos_extraidos) : null,
+      companyId,
     ]
   );
 
@@ -671,17 +682,17 @@ app.put('/api/finanzas/:id', async (req, res) => {
     `UPDATE finance_invoices SET
        tipo = COALESCE($1, tipo), contraparte = $2, ruc = $3, direccion = $4, telefono = $5, correo = $6,
        numero_factura = $7, fecha = $8, subtotal = $9, itbm = $10, total = COALESCE($11, total), proyecto = $12, notas = $13, updated_at = now()
-     WHERE id = $14
+     WHERE id = $14 AND company_id = $15
      RETURNING id, tipo, contraparte, ruc, direccion, telefono, correo, numero_factura, fecha, subtotal, itbm, total, proyecto, notas, archivo_nombre, archivo_tipo, created_at`,
     [tipo || null, contraparte || null, ruc || null, direccion || null, telefono || null, correo || null,
-      numero_factura || null, fecha || null, subtotal || null, itbm || null, total, proyecto || null, notas || null, req.params.id]
+      numero_factura || null, fecha || null, subtotal || null, itbm || null, total, proyecto || null, notas || null, req.params.id, resolveCompanyId(req)]
   );
   if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
 });
 
 app.delete('/api/finanzas/:id', async (req, res) => {
-  await pool.query('DELETE FROM finance_invoices WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM finance_invoices WHERE id = $1 AND company_id = $2', [req.params.id, resolveCompanyId(req)]);
   res.json({ ok: true });
 });
 

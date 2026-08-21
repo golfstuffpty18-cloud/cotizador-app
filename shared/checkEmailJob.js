@@ -83,11 +83,11 @@ async function saveOpportunity(op) {
 // saber si el proceso ya está publicado en el portal de PanamaCompra.
 // convocatoria queda NULL a propósito: es la marca de "placeholder" que
 // saveOpportunity() busca para completar esta misma fila más tarde.
-async function insertPlaceholderOpportunity(e) {
+async function insertPlaceholderOpportunity(e, companyId) {
   await pool.query(
     `INSERT INTO opportunities
-      (act_number, convocatoria, title, entity, window_info, category_match, recommendation, reasoning, decision, email_uid)
-     VALUES ($1, NULL, $2, $3, $4, false, 'revisar', $5, 'pending', $6)`,
+      (act_number, convocatoria, title, entity, window_info, category_match, recommendation, reasoning, decision, email_uid, company_id)
+     VALUES ($1, NULL, $2, $3, $4, false, 'revisar', $5, 'pending', $6, $7)`,
     [
       e.actNumber,
       'Nueva solicitud de cotización — detalles del proceso pendientes de PanamaCompra',
@@ -95,6 +95,7 @@ async function insertPlaceholderOpportunity(e) {
       e.windowFromEmail,
       'Detectado por correo; buscando ítems y precio de referencia en el portal de PanamaCompra.',
       e.uid,
+      companyId,
     ]
   );
 }
@@ -130,7 +131,7 @@ function withTimeout(promise, ms, label) {
 
 let running = false;
 
-async function runCheckEmailJob() {
+async function runCheckEmailJob(companyId) {
   if (running) {
     return { skipped: true, reason: 'ya hay una revisión en curso' };
   }
@@ -139,7 +140,7 @@ async function runCheckEmailJob() {
   const push = (msg) => { log.push(msg); console.log(msg); };
 
   try {
-    const result = await withTimeout(runCheckEmailJobInner(push), JOB_TIMEOUT_MS, 'chequeo de correo completo');
+    const result = await withTimeout(runCheckEmailJobInner(push, companyId), JOB_TIMEOUT_MS, 'chequeo de correo completo');
     return { ...result, log };
   } catch (err) {
     push(`Error/tiempo agotado en el chequeo: ${err.message}`);
@@ -149,7 +150,7 @@ async function runCheckEmailJob() {
   }
 }
 
-async function runCheckEmailJobInner(push) {
+async function runCheckEmailJobInner(push, companyId) {
   await init();
 
   const deleted = await cleanupExpired();
@@ -169,9 +170,9 @@ async function runCheckEmailJobInner(push) {
     seenForAlert.add(e.actNumber);
     if (await hasBeenAlerted(e.actNumber)) continue;
     if (await isActProcessed(e.actNumber)) continue;
-    await insertPlaceholderOpportunity(e);
+    await insertPlaceholderOpportunity(e, companyId);
     await notifyImmediateAlert(e);
-    await markAlerted(e.actNumber, e.subject);
+    await markAlerted(e.actNumber, e.subject, companyId);
     alerted++;
     push(`Alerta inmediata enviada: ${e.actNumber}`);
   }
@@ -229,6 +230,7 @@ async function runCheckEmailJobInner(push) {
             emailUid: e.uid,
             pcEstado,
             tipoProceso: pc.tipoProcesoLabel(r.idTipoProceso),
+            companyId,
           };
 
           const inserted = await saveOpportunity(op);
@@ -243,7 +245,7 @@ async function runCheckEmailJobInner(push) {
 
         // Ya se procesó por completo este acto: no volver a mirarlo aunque
         // luego se borre de "opportunities" por vencido.
-        await markActProcessed(e.actNumber);
+        await markActProcessed(e.actNumber, companyId);
       } catch (err) {
         push(`Error procesando ${e.actNumber}: ${err.message}`);
       }

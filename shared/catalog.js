@@ -41,7 +41,7 @@ function classifyTecnologia(text) {
 // que se pueda adivinar por texto, porque el texto del pliego casi nunca lo
 // aclara. Si nada alcanza el umbral en ningún paso, cae a buscar en todo el
 // catálogo.
-async function findBestMatch(descripcion, categoria, tecnologiaHint) {
+async function findBestMatch(descripcion, categoria, tecnologiaHint, companyId) {
   const target = normalize(descripcion);
   if (!target) return null;
   const tecnologia = tecnologiaHint || classifyTecnologia(descripcion);
@@ -57,7 +57,7 @@ async function findBestMatch(descripcion, categoria, tecnologiaHint) {
   };
 
   if (categoria) {
-    const { rows } = await pool.query('SELECT * FROM catalog_items WHERE categoria = $1', [categoria]);
+    const { rows } = await pool.query('SELECT * FROM catalog_items WHERE categoria = $1 AND company_id = $2', [categoria, companyId]);
 
     if (tecnologia && tecnologia !== 'Universal') {
       const compatibles = rows.filter(r => !r.subcategoria || r.subcategoria === tecnologia || r.subcategoria === 'Universal');
@@ -69,7 +69,7 @@ async function findBestMatch(descripcion, categoria, tecnologiaHint) {
     if (hit) return hit;
   }
 
-  const { rows } = await pool.query('SELECT * FROM catalog_items');
+  const { rows } = await pool.query('SELECT * FROM catalog_items WHERE company_id = $1', [companyId]);
   return tryMatch(rows);
 }
 
@@ -79,10 +79,10 @@ async function findBestMatch(descripcion, categoria, tecnologiaHint) {
 // catálogo. `tecnologiaHint` (Convencional/Direccionable) aplica a TODOS los
 // ítems de la cotización por igual, no por ítem — es una sola respuesta del
 // usuario para toda la cotización de incendio.
-async function suggestPricesForItems(items, categoria, tecnologiaHint) {
+async function suggestPricesForItems(items, categoria, tecnologiaHint, companyId) {
   const out = [];
   for (const item of items) {
-    const match = await findBestMatch(item.descripcion, categoria, tecnologiaHint);
+    const match = await findBestMatch(item.descripcion, categoria, tecnologiaHint, companyId);
     out.push({
       ...item,
       modelo: item.modelo || (match ? match.item.modelo : '') || '',
@@ -99,8 +99,8 @@ async function suggestPricesForItems(items, categoria, tecnologiaHint) {
 // por cada ítem de la cotización — con cotizaciones de varios ítems eso eran
 // varias vueltas redundantes a la base de datos, justo el tipo de demora que
 // hace que "aprobar y generar el PDF" se sienta colgado).
-async function upsertFromQuoteItems(items, { proveedor } = {}) {
-  const { rows } = await pool.query('SELECT id, descripcion FROM catalog_items');
+async function upsertFromQuoteItems(items, { proveedor } = {}, companyId) {
+  const { rows } = await pool.query('SELECT id, descripcion FROM catalog_items WHERE company_id = $1', [companyId]);
 
   for (const item of items) {
     if (!item.descripcion || !item.costoDistribuidor) continue;
@@ -125,9 +125,9 @@ async function upsertFromQuoteItems(items, { proveedor } = {}) {
       );
     } else {
       const { rows: inserted } = await pool.query(
-        `INSERT INTO catalog_items (descripcion, modelo, costo_distribuidor, margen_g, proveedor, fecha_cotizacion)
-         VALUES ($1,$2,$3,$4,$5, now()) RETURNING id, descripcion`,
-        [item.descripcion, item.modelo || '', item.costoDistribuidor, item.margenG || null, proveedor || '']
+        `INSERT INTO catalog_items (descripcion, modelo, costo_distribuidor, margen_g, proveedor, fecha_cotizacion, company_id)
+         VALUES ($1,$2,$3,$4,$5, now(), $6) RETURNING id, descripcion`,
+        [item.descripcion, item.modelo || '', item.costoDistribuidor, item.margenG || null, proveedor || '', companyId]
       );
       rows.push(inserted[0]); // para que otros ítems de esta misma cotización puedan matchear contra este
     }
@@ -139,7 +139,7 @@ async function upsertFromQuoteItems(items, { proveedor } = {}) {
 // muy parecido en el catálogo lo actualiza (conserva el id, actualiza
 // precio/categoría/etc.), si no, inserta un ítem nuevo. Devuelve un resumen
 // para poder confirmarle al usuario qué se cargó.
-async function importCatalogRows(rows, { defaultCategoria } = {}) {
+async function importCatalogRows(rows, { defaultCategoria } = {}, companyId) {
   let creados = 0;
   let actualizados = 0;
   let omitidos = 0;
@@ -147,7 +147,7 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
   // Traer el catálogo UNA sola vez (antes era un SELECT del catálogo entero
   // por cada fila del Excel importado — con archivos grandes eso eran
   // decenas de vueltas redundantes a la base de datos).
-  const { rows: existentes } = await pool.query('SELECT id, descripcion FROM catalog_items');
+  const { rows: existentes } = await pool.query('SELECT id, descripcion FROM catalog_items WHERE company_id = $1', [companyId]);
 
   for (const row of rows) {
     const descripcion = (row.descripcion || '').trim();
@@ -187,9 +187,9 @@ async function importCatalogRows(rows, { defaultCategoria } = {}) {
       actualizados++;
     } else {
       const { rows: inserted } = await pool.query(
-        `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, proveedor, notas, fecha_cotizacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now()) RETURNING id, descripcion`,
-        [descripcion, categoria, subcategoria, marca, modelo, costo, proveedor, notas]
+        `INSERT INTO catalog_items (descripcion, categoria, subcategoria, marca, modelo, costo_distribuidor, proveedor, notas, fecha_cotizacion, company_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now(), $9) RETURNING id, descripcion`,
+        [descripcion, categoria, subcategoria, marca, modelo, costo, proveedor, notas, companyId]
       );
       existentes.push(inserted[0]); // para que otras filas del mismo archivo puedan matchear contra esta
       creados++;

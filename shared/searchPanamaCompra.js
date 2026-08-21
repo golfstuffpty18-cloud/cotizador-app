@@ -25,7 +25,7 @@ const MAX_DETALLES = 30;
 // que no tiene esa distinción).
 const LABEL_TO_PC_ESTADO = { Abiertas: 'abierta', Programadas: 'programada' };
 
-async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioMin, precioMax } = {}) {
+async function searchOneEstado(cookie, idTipoProceso, idEstado, label, companyId, { precioMin, precioMax } = {}) {
   const registros = await pc.buscarPorEstados(cookie, [idEstado], undefined, idTipoProceso);
   const candidatas = registros.filter(r => evaluate({ title: r.titulo }).categoryMatch);
 
@@ -63,11 +63,12 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
       reasoning: ev.reasoning,
       pcEstado: LABEL_TO_PC_ESTADO[label] || null,
       tipoProceso: pc.tipoProcesoLabel(idTipoProceso),
+      companyId,
     };
 
     const row = await upsertOpportunity(op);
     if (row) {
-      await markActProcessed(actNumber);
+      await markActProcessed(actNumber, companyId);
       await notifySubscribers(row);
       nuevas.push(row);
     }
@@ -87,10 +88,10 @@ async function searchOneEstado(cookie, idTipoProceso, idEstado, label, { precioM
 // "Programadas" — son dos renglones de búsqueda distintos en PanamaCompra y
 // se reportan por separado (no se mezclan en un solo resultado), aunque
 // ambas terminen guardándose en el mismo listado de oportunidades.
-async function searchOpenByCategory() {
+async function searchOpenByCategory(companyId) {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
-  const abiertas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.ABIERTA, 'Abiertas');
-  const programadas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.PROGRAMADA, 'Programadas');
+  const abiertas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.ABIERTA, 'Abiertas', companyId);
+  const programadas = await searchOneEstado(cookie, pc.TIPO_PROCESO_COTIZACION, pc.ESTADO.PROGRAMADA, 'Programadas', companyId);
   return { abiertas, programadas };
 }
 
@@ -102,10 +103,10 @@ async function searchOpenByCategory() {
 // estado "Vigente" (36) — no hay un equivalente de "Programada".
 // precioMin/precioMax quedan como resguardo defensivo, aunque por
 // construcción cualquier acto de este tipo ya cae en ese rango.
-async function searchCompraMenor(precioMin = 10000, precioMax = 50000) {
+async function searchCompraMenor(companyId, precioMin = 10000, precioMax = 50000) {
   const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
   const vigentes = await searchOneEstado(
-    cookie, pc.TIPO_PROCESO_COMPRA_MENOR, pc.ESTADO_COMPRA_MENOR.VIGENTE, 'Vigentes', { precioMin, precioMax }
+    cookie, pc.TIPO_PROCESO_COMPRA_MENOR, pc.ESTADO_COMPRA_MENOR.VIGENTE, 'Vigentes', companyId, { precioMin, precioMax }
   );
   return { vigentes };
 }
@@ -130,11 +131,11 @@ let running = false;
 // depender de que alguien presione los botones de búsqueda a mano. Se
 // llaman en secuencia, no en paralelo — dos login() simultáneos contra
 // PanamaCompra con el mismo usuario podrían invalidarse la sesión entre sí.
-async function runSearchJob() {
+async function runSearchJob(companyId) {
   if (running) return { skipped: true, reason: 'ya hay una búsqueda en curso' };
   running = true;
   try {
-    return await withTimeout(runSearchJobInner(), JOB_TIMEOUT_MS, 'búsqueda directa completa');
+    return await withTimeout(runSearchJobInner(companyId), JOB_TIMEOUT_MS, 'búsqueda directa completa');
   } catch (err) {
     return { ok: false, error: err.message };
   } finally {
@@ -142,10 +143,10 @@ async function runSearchJob() {
   }
 }
 
-async function runSearchJobInner() {
+async function runSearchJobInner(companyId) {
   const deleted = await cleanupExpired();
-  const enLinea = await searchOpenByCategory();
-  const compraMenor = await searchCompraMenor();
+  const enLinea = await searchOpenByCategory(companyId);
+  const compraMenor = await searchCompraMenor(companyId);
   return { ok: true, deleted, enLinea, compraMenor };
 }
 

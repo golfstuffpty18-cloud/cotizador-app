@@ -314,15 +314,20 @@ async function cleanupExpired() {
   return rowCount;
 }
 
+// companyId es opcional por ahora (paso 2 de la migración multi-empresa:
+// dual-write mientras la restricción única de processed_acts sigue siendo
+// solo act_number — se endurece en el paso 3). Si se manda, también se
+// guarda/filtra por empresa; "ya procesado" hoy sigue siendo efectivamente
+// global hasta que esa restricción cambie.
 async function isActProcessed(actNumber) {
   const { rows } = await pool.query('SELECT 1 FROM processed_acts WHERE act_number = $1', [actNumber]);
   return rows.length > 0;
 }
 
-async function markActProcessed(actNumber) {
+async function markActProcessed(actNumber, companyId) {
   await pool.query(
-    'INSERT INTO processed_acts (act_number) VALUES ($1) ON CONFLICT (act_number) DO NOTHING',
-    [actNumber]
+    'INSERT INTO processed_acts (act_number, company_id) VALUES ($1,$2) ON CONFLICT (act_number) DO NOTHING',
+    [actNumber, companyId ?? null]
   );
 }
 
@@ -335,10 +340,10 @@ async function hasBeenAlerted(actNumber) {
   return rows.length > 0;
 }
 
-async function markAlerted(actNumber, subject) {
+async function markAlerted(actNumber, subject, companyId) {
   await pool.query(
-    'INSERT INTO email_alerts (act_number, subject) VALUES ($1,$2) ON CONFLICT (act_number) DO NOTHING',
-    [actNumber, subject]
+    'INSERT INTO email_alerts (act_number, subject, company_id) VALUES ($1,$2,$3) ON CONFLICT (act_number) DO NOTHING',
+    [actNumber, subject, companyId ?? null]
   );
 }
 
