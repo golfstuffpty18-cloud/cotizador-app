@@ -243,12 +243,27 @@ WHERE source != 'directo'
    OR (deadline IS NULL AND created_at < now() - interval '5 days'));
 `;
 
+// Cada backfill es una reparación secundaria de datos viejos, no algo de lo
+// que dependa el arranque del servidor — un error en uno (ej. una
+// restricción que todavía no tiene la forma que el backfill espera) no debe
+// tumbar toda la app. Ocurrió justo esto: al cerrar las restricciones de
+// company_id en producción, backfillProcessedActs (que corre en cada
+// arranque) crasheaba el servidor entero porque su ON CONFLICT no se había
+// actualizado a tiempo.
+async function runBackfillSafely(name, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    console.error(`init(): backfill "${name}" falló, se ignora y sigue el arranque:`, err.message);
+  }
+}
+
 async function init() {
   await pool.query(SCHEMA);
-  await backfillDeadlines();
-  await backfillWindowStarts();
-  await backfillProcessedActs();
-  await backfillTipoProceso();
+  await runBackfillSafely('backfillDeadlines', backfillDeadlines);
+  await runBackfillSafely('backfillWindowStarts', backfillWindowStarts);
+  await runBackfillSafely('backfillProcessedActs', backfillProcessedActs);
+  await runBackfillSafely('backfillTipoProceso', backfillTipoProceso);
 }
 
 // El número de acto de PanamaCompra ya trae el tipo de proceso codificado
@@ -271,9 +286,9 @@ async function backfillTipoProceso() {
 // filas guardadas antes de que esta tabla existiera).
 async function backfillProcessedActs() {
   await pool.query(`
-    INSERT INTO processed_acts (act_number, processed_at)
-    SELECT DISTINCT act_number, now() FROM opportunities
-    ON CONFLICT (act_number) DO NOTHING
+    INSERT INTO processed_acts (act_number, company_id, processed_at)
+    SELECT DISTINCT act_number, company_id, now() FROM opportunities WHERE company_id IS NOT NULL
+    ON CONFLICT (company_id, act_number) DO NOTHING
   `);
 }
 
