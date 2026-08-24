@@ -328,14 +328,8 @@ async function isActProcessed(actNumber, companyId) {
 }
 
 async function markActProcessed(actNumber, companyId) {
-  // ON CONFLICT sigue apuntando a la restricción vieja (solo act_number) a
-  // propósito: todavía es la que existe de verdad en la base. Se actualiza a
-  // (company_id, act_number) en un cambio aparte, después de correr
-  // /api/cron/close-company-id-constraints (paso 3), que es lo que realmente
-  // cambia la restricción — desplegar los dos juntos rompería toda búsqueda
-  // hasta que ese endpoint corriera.
   await pool.query(
-    'INSERT INTO processed_acts (act_number, company_id) VALUES ($1,$2) ON CONFLICT (act_number) DO NOTHING',
+    'INSERT INTO processed_acts (act_number, company_id) VALUES ($1,$2) ON CONFLICT (company_id, act_number) DO NOTHING',
     [actNumber, companyId]
   );
 }
@@ -354,10 +348,8 @@ async function hasBeenAlerted(actNumber, companyId) {
 }
 
 async function markAlerted(actNumber, subject, companyId) {
-  // Mismo motivo que en markActProcessed: ON CONFLICT sigue apuntando a la
-  // restricción vieja hasta correr el paso 3.
   await pool.query(
-    'INSERT INTO email_alerts (act_number, subject, company_id) VALUES ($1,$2,$3) ON CONFLICT (act_number) DO NOTHING',
+    'INSERT INTO email_alerts (act_number, subject, company_id) VALUES ($1,$2,$3) ON CONFLICT (company_id, act_number) DO NOTHING',
     [actNumber, subject, companyId]
   );
 }

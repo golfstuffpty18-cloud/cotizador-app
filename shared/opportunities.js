@@ -32,7 +32,7 @@ async function upsertOpportunity(op) {
     `INSERT INTO opportunities
       (act_number, convocatoria, title, entity, entity_address, entity_province, reference_price, window_info, deadline, items, category_match, recommendation, reasoning, decision, email_uid, category, pc_estado, window_start, tipo_proceso, company_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$14,$15,$16,$17,$18,$19)
-     ON CONFLICT (act_number, convocatoria) DO NOTHING
+     ON CONFLICT (company_id, act_number, convocatoria) DO NOTHING
      RETURNING *`,
     [op.actNumber, op.convocatoria, op.title, op.entity, op.entityAddress, op.entityProvince, op.referencePrice, op.windowInfo, op.deadline,
      JSON.stringify(op.items || []), op.categoryMatch, op.recommendation, op.reasoning, op.emailUid ?? null, op.category ?? null, op.pcEstado ?? null, op.windowStart ?? null, op.tipoProceso ?? null, op.companyId]

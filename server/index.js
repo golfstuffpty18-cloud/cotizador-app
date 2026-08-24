@@ -78,7 +78,7 @@ app.post('/api/push/subscribe', async (req, res) => {
   if (!sub || !sub.endpoint || !sub.keys) return res.status(400).json({ error: 'suscripción inválida' });
   await pool.query(
     `INSERT INTO push_subscriptions (endpoint, p256dh, auth, company_id) VALUES ($1,$2,$3,$4)
-     ON CONFLICT (endpoint) DO NOTHING`,
+     ON CONFLICT (company_id, endpoint) DO NOTHING`,
     [sub.endpoint, sub.keys.p256dh, sub.keys.auth, resolveCompanyId(req)]
   );
   res.json({ ok: true });
