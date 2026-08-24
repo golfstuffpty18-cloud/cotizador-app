@@ -78,6 +78,39 @@ async function generateQuoteExcel({ opportunity, quote }) {
   labeledRow(sheet, r, 'Dirección:', (quote && quote.cliente_direccion) || (opportunity && opportunity.entity_address) || ''); r++;
   labeledRow(sheet, r, 'Ciudad:', (quote && quote.cliente_ciudad) || (opportunity && opportunity.entity_province) || 'Panamá'); r++;
   labeledRow(sheet, r, 'Forma de pago:', (quote && quote.forma_pago) || 'Crédito'); r++;
+
+  // ITBM: dropdown para casos especiales (institución exonerada) — antes
+  // estaba fijo en 7% en toda la hoja sin forma de apagarlo. El renglón de
+  // ITBM por ítem y el ITBM total (más abajo) referencian esta celda, así
+  // que basta con cambiar el dropdown aquí para que todo el Excel (y el PDF
+  // final, al volver a subir el archivo) respete la tasa elegida.
+  const itbmRateDefault = (quote && quote.itbm_rate != null && !isNaN(Number(quote.itbm_rate))) ? Number(quote.itbm_rate) : 0.07;
+  const itbmRateRow = r;
+  const itbmRateAbsRef = `$B$${itbmRateRow}`;
+  sheet.getCell(r, 1).value = 'ITBM:';
+  sheet.getCell(r, 1).font = { bold: true, size: 9, color: { argb: 'FF0A0A1A' } };
+  const itbmRateCell = sheet.getCell(r, 2);
+  itbmRateCell.value = itbmRateDefault;
+  itbmRateCell.numFmt = '0%';
+  itbmRateCell.font = { size: 9, bold: true };
+  itbmRateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INPUT_FILL } };
+  itbmRateCell.border = {
+    top: { style: 'thin', color: { argb: INPUT_BORDER } }, bottom: { style: 'thin', color: { argb: INPUT_BORDER } },
+    left: { style: 'thin', color: { argb: INPUT_BORDER } }, right: { style: 'thin', color: { argb: INPUT_BORDER } },
+  };
+  itbmRateCell.dataValidation = {
+    type: 'list',
+    allowBlank: false,
+    formulae: ['"0.07,0"'],
+    showErrorMessage: true,
+    errorTitle: 'Valor no válido',
+    error: 'Elige 0.07 (7%, normal) o 0 (institución exonerada de ITBM).',
+  };
+  sheet.mergeCells(r, 3, r, 6);
+  const itbmRateNote = sheet.getCell(r, 3);
+  itbmRateNote.value = '← elige 7% (normal) o 0% (institución exonerada de ITBM)';
+  itbmRateNote.font = { italic: true, size: 8, color: { argb: 'FF8A8CA3' } };
+  r++;
   r += 1;
 
   // ===== Items table =====
@@ -127,7 +160,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
     // Suma) queda consistente con el precio que realmente se ve y se sube.
     row.getCell(9).value = { formula: `ROUND(PRODUCT(F${r},H${r}),2)`, result: 0 };
     row.getCell(10).value = { formula: `PRODUCT(I${r},D${r})`, result: 0 };
-    row.getCell(11).value = { formula: `ROUND(PRODUCT(J${r},0.07),2)`, result: 0 };
+    row.getCell(11).value = { formula: `ROUND(PRODUCT(J${r},${itbmRateAbsRef}),2)`, result: 0 };
     row.getCell(12).value = { formula: `SUM(J${r},K${r})`, result: 0 };
     row.getCell(13).value = item.precioReferencia != null ? item.precioReferencia : null; // dato informativo de PanamaCompra, no se edita
     row.getCell(13).font = { italic: true, size: 8.5, color: { argb: 'FF565873' } };
@@ -155,7 +188,12 @@ async function generateQuoteExcel({ opportunity, quote }) {
 
   r += 1;
   totalLine(sheet, r, 'SUBTOTAL', `SUM(J${firstItemRow}:J${lastItemRow})`); const subtotalRow = r; r++;
-  totalLine(sheet, r, 'ITBM (7%)', `ROUND(J${subtotalRow}*0.07,2)`); const itbmRow = r; r++;
+  totalLine(sheet, r, 'ITBM', `ROUND(J${subtotalRow}*${itbmRateAbsRef},2)`);
+  // Etiqueta con fórmula (en vez de texto fijo "ITBM (7%)") para que si el
+  // usuario cambia el dropdown de arriba a 0%, el rótulo lo refleje también
+  // — así no queda un "(7%)" desactualizado al lado de un monto en 0.
+  sheet.getCell(r, 1).value = { formula: `"ITBM (" & TEXT(${itbmRateAbsRef},"0%") & ")"` };
+  const itbmRow = r; r++;
   totalLine(sheet, r, 'TOTAL COTIZACIÓN', `J${subtotalRow}+J${itbmRow}`, true); const totalRow = r; r++;
 
   // ===== Verificación contra el precio de referencia de PanamaCompra =====
@@ -257,7 +295,7 @@ async function generateQuoteExcel({ opportunity, quote }) {
 
   sheet.mergeCells(`A${r}:L${r}`);
   const note = sheet.getCell(`A${r}`);
-  note.value = 'Instrucciones: complete "COSTO DE DISTRIBUIDOR" y "%G" (resaltados) por cada ítem — el resto, incluyendo la verificación del precio de referencia y el análisis de rentabilidad de abajo, se calcula solo. Guarde el archivo y súbalo de nuevo en la app. El PDF final para el cliente solo mostrará Descripción, Modelo, Unidades, Precio Un. y Subtotal (no el análisis interno).';
+  note.value = 'Instrucciones: complete "COSTO DE DISTRIBUIDOR" y "%G" (resaltados) por cada ítem — el resto, incluyendo la verificación del precio de referencia y el análisis de rentabilidad de abajo, se calcula solo. Para casos especiales puede escribir el "Precio Un." directamente (se respeta tal cual, sin recalcular). El dropdown "ITBM" (junto a Forma de pago) permite poner la cotización en 0% para instituciones exoneradas. Guarde el archivo y súbalo de nuevo en la app. El PDF final para el cliente solo mostrará Descripción, Modelo, Unidades, Precio Un. y Subtotal (no el análisis interno).';
   note.font = { italic: true, size: 8, color: { argb: '8A8CA3' } };
   note.alignment = { wrapText: true };
 

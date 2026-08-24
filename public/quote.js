@@ -6,6 +6,15 @@ function money(n) {
   return 'B/. ' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Refleja el dropdown de ITBM del Excel (generateQuoteExcel.js): 0.07
+// (normal) o 0 (institución exonerada). quote.itbm_rate es null en
+// cotizaciones guardadas antes de que existiera esta columna — esas siempre
+// fueron al 7%.
+function itbmLabel(quote) {
+  const rate = quote.itbm_rate != null ? Number(quote.itbm_rate) : 0.07;
+  return rate > 0 ? `ITBM (${Math.round(rate * 100)}%)` : 'ITBM (Institución exonerada)';
+}
+
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -253,7 +262,7 @@ function renderPreview(quote) {
     ${quote.comentarios ? `<p style="font-size:.82rem;color:var(--gray-600);margin-top:10px"><b>Comentarios:</b> ${escapeHtml(quote.comentarios)}</p>` : ''}
     <div class="totals">
       <div class="line"><span>Subtotal</span><span>${money(quote.subtotal)}</span></div>
-      <div class="line"><span>ITBM (7%)</span><span>${money(quote.itbm)}</span></div>
+      <div class="line"><span>${itbmLabel(quote)}</span><span>${money(quote.itbm)}</span></div>
       <div class="line total"><span>TOTAL</span><span>${money(quote.total)}</span></div>
     </div>
   `;

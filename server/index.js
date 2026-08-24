@@ -235,7 +235,7 @@ app.get('/api/opportunities/:id/quote', async (req, res) => {
   res.json(rest);
 });
 
-function computeTotals(items) {
+function computeTotals(items, itbmRate = 0.07) {
   const rawSubtotal = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0), 0);
   // Redondeado a centavos en cada paso (igual que en el Excel,
   // generateQuoteExcel.js) — si no, además del desfase de 1 centavo contra
@@ -243,7 +243,7 @@ function computeTotals(items) {
   // residuos binarios (ej. 374.96000000000004) que se ven bien en pantalla
   // por el formato, pero quedan guardados sucios en la base de datos.
   const subtotal = Math.round(rawSubtotal * 100) / 100;
-  const itbm = Math.round(subtotal * 0.07 * 100) / 100;
+  const itbm = Math.round(subtotal * itbmRate * 100) / 100;
   const total = Math.round((subtotal + itbm) * 100) / 100;
   return { subtotal, itbm, total };
 }
@@ -251,14 +251,19 @@ function computeTotals(items) {
 async function saveDraft(oppId, data) {
   const { cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items } = data;
   const safeItems = Array.isArray(items) ? items : [];
-  const { subtotal, itbm, total } = computeTotals(safeItems);
+  // Solo se aceptan 0.07 (7%, normal) o 0 (institución exonerada de ITBM) —
+  // cualquier otra cosa, incluido undefined (Excel viejo sin la celda ITBM),
+  // cae al 7% de siempre para no romper cotizaciones existentes.
+  const rawItbmRate = Number(data.itbm_rate);
+  const itbm_rate = Number.isFinite(rawItbmRate) && rawItbmRate < 0.035 ? 0 : 0.07;
+  const { subtotal, itbm, total } = computeTotals(safeItems, itbm_rate);
 
   // company_id se deriva de la propia oportunidad (subquery), no se recibe
   // por parámetro — así es imposible que quotes.company_id quede
   // desalineado del de opportunities.company_id.
   const { rows } = await pool.query(
-    `INSERT INTO quotes (opportunity_id, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items, subtotal, itbm, total, updated_at, company_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), (SELECT company_id FROM opportunities WHERE id = $1))
+    `INSERT INTO quotes (opportunity_id, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago, comentarios, items, subtotal, itbm, itbm_rate, total, updated_at, company_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now(), (SELECT company_id FROM opportunities WHERE id = $1))
      ON CONFLICT (opportunity_id) DO UPDATE SET
        cliente_nombre = EXCLUDED.cliente_nombre,
        cliente_ruc = EXCLUDED.cliente_ruc,
@@ -269,12 +274,13 @@ async function saveDraft(oppId, data) {
        items = EXCLUDED.items,
        subtotal = EXCLUDED.subtotal,
        itbm = EXCLUDED.itbm,
+       itbm_rate = EXCLUDED.itbm_rate,
        total = EXCLUDED.total,
        updated_at = now()
      WHERE quotes.estado = 'borrador'
      RETURNING *`,
     [oppId, cliente_nombre, cliente_ruc, cliente_direccion, cliente_ciudad, forma_pago || 'Crédito', comentarios,
-     JSON.stringify(safeItems), subtotal, itbm, total]
+     JSON.stringify(safeItems), subtotal, itbm, itbm_rate, total]
   );
   return rows[0] || null;
 }

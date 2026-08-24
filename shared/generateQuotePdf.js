@@ -139,8 +139,12 @@ function generateQuotePdf({ quote, opportunity }) {
       doc.text(money(value), totalsX + 110, y, { width: 80, align: 'right' });
       y += bold ? 18 : 15;
     }
+    // itbm_rate puede venir nulo en cotizaciones guardadas antes de que
+    // existiera esta columna (siempre fueron al 7%, DEFAULT de la migración).
+    const itbmRate = quote.itbm_rate != null ? Number(quote.itbm_rate) : 0.07;
+    const itbmLabel = itbmRate > 0 ? `ITBM (${Math.round(itbmRate * 100)}%)` : 'ITBM (Institución exonerada)';
     totalLine('Subtotal', quote.subtotal);
-    totalLine('ITBM (7%)', quote.itbm);
+    totalLine(itbmLabel, quote.itbm);
     doc.moveTo(totalsX, y).lineTo(totalsX + 190, y).strokeColor(BLUE).lineWidth(1.5).stroke();
     y += 6;
     totalLine('TOTAL', quote.total, true);

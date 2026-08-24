@@ -232,6 +232,13 @@ ALTER TABLE processed_acts ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCE
 ALTER TABLE email_alerts ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
 ALTER TABLE catalog_items ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
 ALTER TABLE finance_invoices ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id);
+
+-- Tasa de ITBM de la cotización: 0.07 (7%, normal) o 0 (institución
+-- exonerada). Antes estaba fijo en 7% en todo el sistema (server, Excel y
+-- PDF) sin forma de apagarlo para clientes exentos. DEFAULT 0.07 respalda
+-- automáticamente las cotizaciones ya existentes con el comportamiento que
+-- siempre tuvieron.
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS itbm_rate NUMERIC NOT NULL DEFAULT 0.07;
 `;
 
 // Las cotizaciones directas (source='directo') no tienen fecha límite de
