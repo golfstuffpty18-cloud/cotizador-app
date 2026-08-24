@@ -121,7 +121,7 @@ function card(op) {
   div.className = 'card';
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-      <span class="badge">${escapeHtml(op.category || 'Sin categoría')}</span>
+      <span class="badge info">${escapeHtml(op.category || 'Sin categoría')}</span>
       <button type="button" class="rm" title="Borrar" style="width:32px;height:32px;flex:none">🗑</button>
     </div>
     <div class="title">${escapeHtml(op.title)}</div>

@@ -1,11 +1,12 @@
 const statusEl = document.getElementById('status');
 const searchBtn = document.getElementById('searchBtn');
+const searchBtnLabel = searchBtn.querySelector('.btn-label');
 
 searchBtn.addEventListener('click', async () => {
   if (searchBtn.dataset.loading === '1') return;
   searchBtn.dataset.loading = '1';
-  const original = searchBtn.textContent;
-  searchBtn.textContent = '⏳ Buscando…';
+  const original = searchBtnLabel.textContent;
+  searchBtnLabel.textContent = 'Buscando…';
   statusEl.textContent = 'Buscando en PanamaCompra… puede tardar unos segundos.';
   try {
     const res = await fetch('/api/search/rango-precio', { method: 'POST' });
@@ -17,7 +18,7 @@ searchBtn.addEventListener('click', async () => {
   } catch (err) {
     statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
   } finally {
-    searchBtn.textContent = original;
+    searchBtnLabel.textContent = original;
     searchBtn.dataset.loading = '';
   }
 });

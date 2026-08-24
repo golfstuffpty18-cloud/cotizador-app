@@ -7,93 +7,75 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/icon-192.png">
 <meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
 <style>
-  :root{
-    --blue:#1616e6; --navy:#0a0a1a;
-    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
-  }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--gray-50); color:#10101f;
-  }
-  header{
-    background: var(--navy); color:#fff; padding:16px 20px;
-    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10;
-  }
-  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
-  header h1{ font-size:.95rem; margin:0; font-weight:700; }
-
-  main{ padding:16px; max-width:680px; margin:0 auto 80px; }
-  section{ background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 10px 24px -16px rgba(10,10,26,.2); }
-  h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:0 0 14px; }
+  section{ background:var(--surface); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:var(--shadow); }
+  section h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); margin:0 0 14px; }
 
   label{ display:block; font-size:.78rem; font-weight:600; color:var(--navy); margin-bottom:5px; }
   input, select, textarea{
-    width:100%; padding:10px 12px; border-radius:8px; border:2px solid var(--gray-100);
-    font-size:.88rem; font-family:inherit; margin-bottom:12px;
+    width:100%; padding:10px 12px; border-radius:8px; border:2px solid var(--border);
+    font-size:.88rem; font-family:inherit; margin-bottom:12px; background:var(--surface); color:var(--text);
   }
   input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--blue); }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-  .item{
-    border:2px solid var(--gray-100); border-radius:10px; padding:12px; margin-bottom:10px;
-  }
+  .item{ border:2px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; }
   .item .desc{ font-size:.85rem; font-weight:600; color:var(--navy); margin-bottom:8px; }
-  .item .meta{ font-size:.75rem; color:var(--gray-400); margin-bottom:8px; }
+  .item .meta{ font-size:.75rem; color:var(--text-faint); margin-bottom:8px; }
   .item .row2{ margin-bottom:0; align-items:end; }
-  .item .subtotal{ font-size:.8rem; color:var(--gray-600); margin-top:8px; text-align:right; }
+  .item .subtotal{ font-size:.8rem; color:var(--text-soft); margin-top:8px; text-align:right; }
 
   .totals{ display:flex; flex-direction:column; gap:6px; align-items:flex-end; margin-top:14px; }
-  .totals .line{ display:flex; justify-content:space-between; width:220px; font-size:.85rem; color:var(--gray-600); }
+  .totals .line{ display:flex; justify-content:space-between; width:220px; font-size:.85rem; color:var(--text-soft); }
   .totals .total{ font-weight:800; font-size:1.1rem; color:var(--navy); border-top:2px solid var(--blue); padding-top:6px; }
 
-  .actions{ display:flex; gap:10px; margin-top:6px; }
-  .btn{ flex:1; padding:13px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.88rem; cursor:pointer; }
-  .btn-ghost{ background:#fff; border-color:var(--gray-100); color:var(--navy); }
-  .btn-primary{ background:var(--blue); color:#fff; }
-  .btn-success{ background:#1fa971; color:#fff; }
+  .qt-actions{ display:flex; gap:10px; margin-top:6px; }
+  .qt-btn{ flex:1; padding:13px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.88rem; cursor:pointer; }
+  .qt-btn-ghost{ background:var(--surface); border-color:var(--border); color:var(--navy); }
+  .qt-btn-primary{ background:var(--blue); color:#fff; }
+  .qt-btn-success{ background:var(--green); color:#fff; }
 
-  #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--gray-600); }
-  .locked-banner{ background:#e6f7ef; color:#1fa971; border-radius:10px; padding:12px 14px; font-size:.85rem; font-weight:600; margin-bottom:14px; }
+  #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--text-soft); }
+  .locked-banner{ background:var(--green-bg); color:var(--green); border-radius:10px; padding:12px 14px; font-size:.85rem; font-weight:600; margin-bottom:14px; }
 
   .stat-row{ display:flex; gap:10px; margin-bottom:18px; }
-  .stat-tile{ flex:1; background:var(--gray-50); border-radius:10px; padding:12px 8px; text-align:center; }
-  .stat-label{ font-size:.66rem; color:var(--gray-400); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
-  .stat-value{ font-size:1rem; font-weight:800; color:var(--navy); }
-  .stat-positive{ color:#1fa971; }
+  .stat-tile{ flex:1; background:var(--surface-2); border-radius:10px; padding:12px 8px; text-align:center; }
+  .stat-row .stat-label{ font-size:.66rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
+  .stat-row .stat-value{ font-size:1rem; font-weight:800; color:var(--navy); }
+  .stat-positive{ color:var(--green); }
   .stat-negative{ color:#c0392b; }
-  .stat-sub{ font-size:.66rem; color:var(--gray-600); margin-top:2px; }
+  .stat-sub{ font-size:.66rem; color:var(--text-soft); margin-top:2px; }
 
   .comp-bar-wrap{ margin-bottom:24px; }
-  .comp-bar{ display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; background:#fff; }
+  .comp-bar{ display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; background:var(--surface); }
   .comp-seg{ display:flex; align-items:center; justify-content:center; min-width:2px; }
   .comp-seg span{ font-size:.68rem; font-weight:700; color:#fff; }
-  .comp-gasto{ background:#1616e6; }
-  .comp-ganancia{ background:#1fa971; }
+  .comp-gasto{ background:var(--blue); }
+  .comp-ganancia{ background:var(--green); }
   .comp-legend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
-  .legend-item{ font-size:.75rem; color:var(--gray-600); display:flex; align-items:center; gap:6px; }
+  .legend-item{ font-size:.75rem; color:var(--text-soft); display:flex; align-items:center; gap:6px; }
   .legend-dot{ width:9px; height:9px; border-radius:2px; display:inline-block; flex:none; }
 
   .tier-title{ font-size:.78rem; font-weight:700; color:var(--navy); margin:4px 0 22px; }
   .tier-chart{ display:flex; align-items:flex-end; gap:6px; height:120px; }
   .tier-col{ flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; min-width:0; }
-  .tier-bar{ width:22px; max-width:70%; background:var(--gray-100); border-radius:4px 4px 0 0; position:relative; }
-  .tier-bar-actual{ background:#1fa971; }
-  .tier-value{ position:absolute; left:50%; top:-17px; transform:translateX(-50%); font-size:.6rem; font-weight:700; color:var(--gray-600); white-space:nowrap; }
-  .tier-bar-actual .tier-value{ color:#1fa971; }
-  .tier-label{ font-size:.64rem; color:var(--gray-400); margin-top:6px; text-align:center; }
-  .tier-col-actual .tier-label{ color:#1fa971; font-weight:700; }
+  .tier-bar{ width:22px; max-width:70%; background:var(--border); border-radius:4px 4px 0 0; position:relative; }
+  .tier-bar-actual{ background:var(--green); }
+  .tier-value{ position:absolute; left:50%; top:-17px; transform:translateX(-50%); font-size:.6rem; font-weight:700; color:var(--text-soft); white-space:nowrap; }
+  .tier-bar-actual .tier-value{ color:var(--green); }
+  .tier-label{ font-size:.64rem; color:var(--text-faint); margin-top:6px; text-align:center; }
+  .tier-col-actual .tier-label{ color:var(--green); font-weight:700; }
 </style>
 </head>
 <body>
-<header>
-  <a href="/">←</a>
-  <h1>Armar cotización</h1>
-</header>
+<script>window.PAGE_META = { title: 'Armar cotización' };</script>
+<div id="app-shell"></div>
 
-<main id="app">Cargando…</main>
+<main class="content" id="app">Cargando…</main>
 
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
 <script src="/quote.js"></script>
 </body>
 </html>

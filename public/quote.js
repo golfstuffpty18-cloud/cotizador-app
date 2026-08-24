@@ -87,9 +87,9 @@ function render(opp, quote) {
         Antes de armar el Excel, dinos qué tecnología es este sistema de incendio — convencional y direccionable
         usan equipo distinto e incompatible entre sí, y así la app te sugiere el precio correcto de una vez.
       </p>
-      <div class="actions">
-        <button class="btn btn-ghost" id="btnConvencional" style="width:100%">Convencional</button>
-        <button class="btn btn-ghost" id="btnDireccionable" style="width:100%">Direccionable</button>
+      <div class="qt-actions">
+        <button class="qt-btn qt-btn-ghost" id="btnConvencional" style="width:100%">Convencional</button>
+        <button class="qt-btn qt-btn-ghost" id="btnDireccionable" style="width:100%">Direccionable</button>
       </div>
     </section>
     ` : ''}
@@ -100,7 +100,7 @@ function render(opp, quote) {
       <p style="font-size:.82rem;color:var(--gray-600);margin-top:0">
         Trae los ítems del proceso con espacio para que definas tu precio unitario final.
       </p>
-      <a class="btn btn-ghost" id="linkDescargarExcel" style="display:block;text-align:center;text-decoration:none;line-height:1.6"
+      <a class="qt-btn qt-btn-ghost" id="linkDescargarExcel" style="display:block;text-align:center;text-decoration:none;line-height:1.6"
          href="/api/opportunities/${oppId}/quote/excel">⬇ Descargar Excel</a>
       <div id="dropboxBackupMsg" style="font-size:.76rem;color:var(--gray-400);margin-top:6px"></div>
     </section>
@@ -111,7 +111,7 @@ function render(opp, quote) {
         Cuando hayas llenado la columna "PRECIO UNITARIO" y guardado el archivo, súbelo aquí.
       </p>
       <input type="file" id="fileInput" accept=".xlsx">
-      <button class="btn btn-primary" id="btnUpload" style="width:100%">Subir Excel completado</button>
+      <button class="qt-btn qt-btn-primary" id="btnUpload" style="width:100%">Subir Excel completado</button>
       <div id="uploadMsg" style="font-size:.82rem;margin-top:8px;color:var(--gray-600)"></div>
     </section>
     ` : ''}
@@ -124,13 +124,13 @@ function render(opp, quote) {
     ${hasDraft ? renderProfitAnalysis(quote) : ''}
 
     ${locked ? `
-      <div class="actions">
-        <a class="btn btn-primary" style="text-align:center;text-decoration:none;line-height:1.6" href="/api/opportunities/${oppId}/quote/pdf" target="_blank">Descargar PDF</a>
-        <button class="btn btn-ghost" id="btnUnlock" style="width:100%">✏️ Modificar cotización</button>
+      <div class="qt-actions">
+        <a class="qt-btn qt-btn-primary" style="text-align:center;text-decoration:none;line-height:1.6" href="/api/opportunities/${oppId}/quote/pdf" target="_blank">Descargar PDF</a>
+        <button class="qt-btn qt-btn-ghost" id="btnUnlock" style="width:100%">✏️ Modificar cotización</button>
       </div>
     ` : (hasDraft ? `
-      <div class="actions">
-        <button class="btn btn-success" id="btnApprove" style="width:100%">Aprobar y generar PDF</button>
+      <div class="qt-actions">
+        <button class="qt-btn qt-btn-success" id="btnApprove" style="width:100%">Aprobar y generar PDF</button>
       </div>
     ` : '')}
     <div id="msg"></div>
@@ -233,7 +233,7 @@ function renderDocumentos(opp) {
   return `
     <section>
       <h2>Documentos adjuntos</h2>
-      <button type="button" class="btn btn-ghost" id="btnSyncDocs" style="width:100%;margin-bottom:10px">🔄 Buscar documentos adjuntos</button>
+      <button type="button" class="qt-btn qt-btn-ghost" id="btnSyncDocs" style="width:100%;margin-bottom:10px">🔄 Buscar documentos adjuntos</button>
       <div id="syncDocsMsg" style="font-size:.78rem;color:var(--gray-600);margin-bottom:${documentos.length ? '10px' : '0'}"></div>
       ${documentos.length ? lista : (opp.documentos_synced_at ? '<p style="font-size:.8rem;color:var(--gray-400);margin:0">Este acto no trae documentos adjuntos en PanamaCompra.</p>' : '<p style="font-size:.8rem;color:var(--gray-400);margin:0">Aún no se han buscado los documentos adjuntos de este acto.</p>')}
     </section>

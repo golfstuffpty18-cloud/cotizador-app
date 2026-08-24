@@ -54,8 +54,8 @@ function render() {
         <label>Notas (opcional)</label>
         <input id="f_notas">
         <div style="display:flex;gap:10px;margin-top:6px">
-          <button type="submit" class="btn btn-primary">Guardar</button>
-          <button type="button" class="btn btn-ghost" id="btnCancel" style="display:none">Cancelar</button>
+          <button type="submit" class="cat-btn cat-btn-primary">Guardar</button>
+          <button type="button" class="cat-btn cat-btn-ghost" id="btnCancel" style="display:none">Cancelar</button>
         </div>
       </form>
     </section>
@@ -101,9 +101,9 @@ async function loadItems() {
       <div class="desc">${escapeHtml(i.descripcion)}</div>
       <div class="meta">${[i.marca, i.modelo].filter(Boolean).map(escapeHtml).join(' · ') || 'Sin marca/modelo'} ${i.proveedor ? '· Proveedor: ' + escapeHtml(i.proveedor) : ''}</div>
       <div class="price">${money(i.costo_distribuidor)} ${i.margen_g ? ' · %G: ' + i.margen_g : ''}</div>
-      <div class="actions">
-        <button class="btn-danger" data-edit="${i.id}" style="background:var(--gray-100);color:var(--navy);margin-right:6px">Editar</button>
-        <button class="btn-danger" data-del="${i.id}">Eliminar</button>
+      <div class="item-actions">
+        <button class="cat-btn-danger" data-edit="${i.id}" style="background:var(--border);color:var(--navy);margin-right:6px">Editar</button>
+        <button class="cat-btn-danger" data-del="${i.id}">Eliminar</button>
       </div>
     </div>
   `).join('');

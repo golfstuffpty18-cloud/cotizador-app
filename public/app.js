@@ -5,18 +5,16 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
-const enableBtn = document.getElementById('enableBtn');
+const enableBtn = document.getElementById('enableBtn'); // creado por shell.js (campana en la topbar)
+const notifActivateBtn = document.getElementById('notifActivateBtn'); // dentro de #emptyState
 const statusEl = document.getElementById('status');
 
 function setButtonState(active) {
-  if (active) {
-    enableBtn.textContent = 'Desactivar notificaciones';
-    enableBtn.classList.add('active');
-    statusEl.textContent = 'Notificaciones activadas ✅';
-  } else {
-    enableBtn.textContent = 'Activar notificaciones';
-    enableBtn.classList.remove('active');
-    statusEl.textContent = '';
+  enableBtn.classList.toggle('active', active);
+  enableBtn.title = active ? 'Desactivar notificaciones' : 'Activar notificaciones';
+  if (notifActivateBtn) {
+    notifActivateBtn.textContent = active ? 'Notificaciones activadas' : 'Activar notificaciones';
+    notifActivateBtn.disabled = active;
   }
 }
 
@@ -66,47 +64,16 @@ async function disableNotifications() {
   }
 }
 
-enableBtn.addEventListener('click', () => {
+function toggleNotifications() {
   if (enableBtn.classList.contains('active')) {
     disableNotifications();
   } else {
     enableNotifications();
   }
-});
-
-// El ícono de cada botón de búsqueda vive dentro de un botón con
-// ícono+etiqueta (.qa-icon/.qa-label) — el "cargando" solo debe reemplazar
-// el ícono, no todo el contenido del botón (si no, se pierde la etiqueta).
-function wireSearchButton(btnId, endpoint, formatMessage) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  const icon = btn.querySelector('.qa-icon');
-  btn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if (btn.dataset.loading === '1') return;
-    btn.dataset.loading = '1';
-    const original = icon.textContent;
-    icon.textContent = '⏳';
-    statusEl.textContent = 'Buscando en PanamaCompra… puede tardar unos segundos.';
-    try {
-      const res = await fetch(endpoint, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error en la búsqueda');
-      statusEl.textContent = formatMessage(data);
-      await loadOpportunities();
-    } catch (err) {
-      statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
-    } finally {
-      icon.textContent = original;
-      btn.dataset.loading = '';
-    }
-  });
 }
 
-wireSearchButton('searchBtn', '/api/search/panamacompra', ({ abiertas, programadas }) =>
-  `Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s) (${abiertas.totalConsultadas} revisadas). ` +
-  `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s) (${programadas.totalConsultadas} revisadas).`
-);
+enableBtn.addEventListener('click', toggleNotifications);
+if (notifActivateBtn) notifActivateBtn.addEventListener('click', toggleNotifications);
 
 async function checkExistingSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -121,11 +88,49 @@ async function checkExistingSubscription() {
 
 checkExistingSubscription();
 
+// ---------- búsqueda manual en PanamaCompra (la detección automática ya
+// corre sola cada 5 min vía cron; esto solo fuerza una pasada inmediata) ----------
+
+async function buscarAhora() {
+  if (statusEl.dataset.loading === '1') return;
+  statusEl.dataset.loading = '1';
+  statusEl.textContent = 'Buscando en PanamaCompra… puede tardar unos segundos.';
+  try {
+    const res = await fetch('/api/search/panamacompra', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error en la búsqueda');
+    const { abiertas, programadas } = data;
+    statusEl.textContent = `Abiertas: ${abiertas.nuevas} nueva(s) de ${abiertas.candidatas} candidata(s). ` +
+      `Programadas: ${programadas.nuevas} nueva(s) de ${programadas.candidatas} candidata(s).`;
+    await loadOpportunities();
+  } catch (err) {
+    statusEl.textContent = 'Error buscando en PanamaCompra: ' + err.message;
+  } finally {
+    statusEl.dataset.loading = '';
+  }
+}
+
+// ---------- filtro de texto sobre la lista ya cargada (no llama al servidor) ----------
+
+let currentOpportunities = [];
+const searchInput = document.getElementById('globalSearchInput'); // creado por shell.js (topbar)
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const filtered = !q ? currentOpportunities : currentOpportunities.filter(op =>
+      (op.title || '').toLowerCase().includes(q) ||
+      (op.entity || '').toLowerCase().includes(q) ||
+      (op.act_number || '').toLowerCase().includes(q)
+    );
+    renderOpportunityList(filtered, q ? 'Sin resultados para tu búsqueda.' : null);
+  });
+}
+
 function fmtDate(d) {
   return new Date(d).toLocaleString('es-PA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-async function decide(id, decision, btnEl) {
+async function decide(id, decision) {
   const res = await fetch(`/api/opportunities/${id}/decision`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -166,16 +171,125 @@ function card(op) {
   return div;
 }
 
-async function loadOpportunities() {
+function renderOpportunityList(items, emptyMessage) {
   const list = document.getElementById('list');
-  const res = await fetch('/api/opportunities?tipo=cotizacion_linea');
-  const items = await res.json();
-  list.innerHTML = '';
+  const emptyState = document.getElementById('emptyState');
+  const listHeading = document.getElementById('listHeading');
+
   if (!items.length) {
-    list.innerHTML = '<div class="empty">Aún no hay oportunidades detectadas.<br>Te avisaremos por notificación en cuanto aparezca una.</div>';
+    list.innerHTML = '';
+    if (emptyMessage) {
+      // Filtro de búsqueda sin resultados: no es "aún no hay oportunidades",
+      // así que no se muestra la ilustración de bienvenida, solo el aviso.
+      emptyState.hidden = true;
+      listHeading.hidden = false;
+      list.innerHTML = `<div class="empty">${emptyMessage}</div>`;
+    } else {
+      emptyState.hidden = false;
+      listHeading.hidden = true;
+    }
     return;
   }
+  emptyState.hidden = true;
+  listHeading.hidden = false;
+  list.innerHTML = '';
   items.forEach(op => list.appendChild(card(op)));
 }
 
-loadOpportunities();
+async function loadOpportunities() {
+  const res = await fetch('/api/opportunities?tipo=cotizacion_linea');
+  currentOpportunities = await res.json();
+  renderOpportunityList(currentOpportunities);
+  return currentOpportunities;
+}
+
+// ---------- grid de módulos ----------
+// Escritorio: imagen de referencia 2 (icono + título + descripción, sin
+// contador). Celular: imagen de referencia 3 (icono + título + estado,
+// ver .module-status en el media query de styles.css).
+
+const MODULE_DEFS = [
+  { key: 'cotizacion_linea', href: '/index.html', icon: 'quote', color: 'mod-blue', title: 'Cotización en línea', desc: 'Solicita cotizaciones para productos o servicios específicos de múltiples proveedores.' },
+  { key: 'compra_menor', href: '/compra-menor.html', icon: 'cart', color: 'mod-emerald', title: 'Compra Menor', desc: 'Realiza compras de bajo monto de forma rápida y sencilla.' },
+  { key: 'programadas', href: '/programadas.html', icon: 'calendar', color: 'mod-violet', title: 'Programadas', desc: 'Gestiona cotizaciones programadas y recordatorios automáticos.' },
+  { key: 'enviadas', href: '/enviadas.html', icon: 'send', color: 'mod-sky', title: 'Enviadas', desc: 'Consulta el historial de cotizaciones enviadas y su estado actual.' },
+  { key: null, href: '/directo.html', icon: 'bolt', color: 'mod-orange', title: 'Directas', desc: 'Envía cotizaciones directas a proveedores seleccionados.' },
+  { key: 'catalogo', href: '/catalog.html', icon: 'book', color: 'mod-teal', title: 'Catálogo', desc: 'Explora productos y servicios disponibles en el catálogo.' },
+  { key: null, href: '/finanzas.html', icon: 'finance', color: 'mod-gold', title: 'Finanzas', desc: 'Consulta reportes financieros y análisis de cotizaciones.' },
+];
+
+function moduleStatusLabel(key, counts) {
+  if (!key) return '';
+  const n = counts[key];
+  if (n == null) return '';
+  if (key === 'programadas') return n > 0 ? `${n} próxima(s)` : 'Ninguna por ahora';
+  if (key === 'catalogo') return `${n} ítem(s)`;
+  if (key === 'enviadas') return `${n} enviada(s)`;
+  return n > 0 ? `${n} activa(s)` : 'Sin novedades';
+}
+
+function renderModuleGrid(counts) {
+  const grid = document.getElementById('moduleGrid');
+  if (!grid) return;
+  grid.innerHTML = MODULE_DEFS.map(m => {
+    const status = moduleStatusLabel(m.key, counts);
+    const hasItems = m.key && counts[m.key] > 0;
+    return `
+      <a class="module-card" href="${m.href}">
+        <div class="module-icon ${m.color}">${icon(m.icon, 20)}</div>
+        <div class="module-title">${m.title}</div>
+        <div class="module-desc">${m.desc}</div>
+        ${status ? `<div class="module-status ${hasItems ? 'has-items' : ''}">${status}</div>` : ''}
+      </a>
+    `;
+  }).join('');
+}
+
+function renderStats(counts) {
+  const row = document.getElementById('statsRow');
+  if (!row) return;
+  const stats = [
+    { label: 'Oportunidades activas', value: counts.cotizacion_linea ?? '—' },
+    { label: 'Programadas', value: counts.programadas ?? '—' },
+    { label: 'Enviadas', value: counts.enviadas ?? '—' },
+    { label: 'Catálogo', value: counts.catalogo ?? '—' },
+  ];
+  row.innerHTML = stats.map(s => `
+    <div class="stat-card">
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+async function safeCount(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) ? data.length : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function loadDashboardExtras() {
+  const [compraMenor, programadas, catalogo, enviadas] = await Promise.all([
+    safeCount('/api/opportunities?tipo=compra_menor'),
+    safeCount('/api/opportunities?vista=programadas'),
+    safeCount('/api/catalog'),
+    safeCount('/api/enviadas'), // depende de un login en vivo a PanamaCompra; null si falla
+  ]);
+  const counts = { compra_menor: compraMenor, programadas, catalogo, enviadas, cotizacion_linea: currentOpportunities.length };
+  renderModuleGrid(counts);
+  renderStats(counts);
+}
+
+const searchNowBtn = document.getElementById('searchNowBtn');
+if (searchNowBtn) searchNowBtn.addEventListener('click', buscarAhora);
+
+(async function initDashboard() {
+  await loadOpportunities();
+  renderModuleGrid({ cotizacion_linea: currentOpportunities.length });
+  await loadDashboardExtras();
+})();

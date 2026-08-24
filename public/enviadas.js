@@ -48,7 +48,7 @@ function card(op) {
   const yaCerro = cierre ? cierre.getTime() < Date.now() : false;
 
   div.innerHTML = `
-    <span class="badge">${escapeHtml(op.estado || 'Sin estado')}</span>
+    <span class="badge info">${escapeHtml(op.estado || 'Sin estado')}</span>
     <div class="title">${escapeHtml(op.titulo)}</div>
     <div class="meta"><b>${escapeHtml(op.numProceso)}</b><br>Cierre: ${fmtDateTime(op.fechaCierre)}</div>
     ${yaCerro

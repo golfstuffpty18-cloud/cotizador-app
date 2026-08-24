@@ -1,0 +1,286 @@
+/* Sistema de diseño compartido — escritorio claro (imagen de referencia 2:
+   topbar oscura + sidebar de navegación + tarjetas de módulo con círculo de
+   color), celular oscuro (imagen de referencia 3: tarjetas de estado) vía el
+   breakpoint de abajo. El tema lo decide el ancho de pantalla, no un switch
+   de usuario. */
+
+:root {
+  --blue: #1616e6;
+  --blue-dark: #0d0d9e;
+  --navy: #0a0a1a;
+  --navy-soft: #12122a;
+
+  --bg: #eef0f6;
+  --surface: #ffffff;
+  --surface-2: #f5f6fb;
+  --border: #e9eaf5;
+  --text: #10101f;
+  --text-soft: #565873;
+  --text-faint: #8a8ca3;
+
+  --green: #1fa971;
+  --green-bg: #e6f7ef;
+  --red: #c0392b;
+  --red-bg: #fbe9e7;
+  --amber: #a97400;
+  --amber-bg: #fff6e0;
+
+  /* Paleta decorativa de los círculos de icono por módulo — deliberadamente
+     distinta de los colores semánticos de arriba (verde/rojo/ámbar ya
+     significan participar/no participar/revisar en las tarjetas de
+     oportunidad, así que los módulos usan sus propios tonos). */
+  --mod-blue: #1616e6;
+  --mod-emerald: #16a34a;
+  --mod-violet: #7c3aed;
+  --mod-sky: #0ea5e9;
+  --mod-orange: #f59e0b;
+  --mod-teal: #0d9488;
+  --mod-gold: #a97400;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 10px 24px -16px rgba(10, 10, 26, 0.25);
+
+  /* Alias de los nombres de variable antiguos (gray-50/100/400/600), usados
+     todavía en el CSS/JS propio de varias páginas no rediseñadas por
+     completo — así siguen resolviendo correctamente sin tener que tocar
+     cada referencia una por una. */
+  --gray-50: var(--surface-2);
+  --gray-100: var(--border);
+  --gray-400: var(--text-faint);
+  --gray-600: var(--text-soft);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a { color: inherit; }
+
+h1, h2, h3, p { margin: 0; }
+
+/* ---------- topbar (shell.js): marca + búsqueda + usuario ---------- */
+
+.topbar {
+  display: flex; align-items: center; gap: 24px;
+  background: var(--navy); color: #fff;
+  padding: 12px 22px;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.topbar-brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; }
+.topbar-brand-name { font-size: 0.92rem; font-weight: 800; white-space: nowrap; }
+
+.topbar-search {
+  flex: 1; max-width: 480px; position: relative;
+  display: flex; align-items: center;
+  background: rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 0 12px;
+}
+.topbar-search-icon { display: flex; color: rgba(255, 255, 255, 0.5); }
+.topbar-search input {
+  flex: 1; background: none; border: none; color: #fff; font-size: 0.85rem;
+  padding: 9px 10px; outline: none;
+}
+.topbar-search input::placeholder { color: rgba(255, 255, 255, 0.45); }
+.topbar-search-kbd {
+  font-size: 0.68rem; font-weight: 700; color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 5px; padding: 1px 6px;
+}
+
+.topbar-bell {
+  width: 38px; height: 38px; border-radius: 999px; border: none;
+  background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.85); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.topbar-bell.active { background: var(--green); color: #fff; }
+
+.topbar-user { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.topbar-avatar {
+  width: 34px; height: 34px; border-radius: 999px; background: var(--blue);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.82rem;
+}
+.topbar-user-name { font-size: 0.8rem; font-weight: 700; line-height: 1.2; }
+.topbar-user-role { font-size: 0.68rem; color: rgba(255, 255, 255, 0.5); }
+
+/* ---------- layout: sidebar + content ---------- */
+
+.app-body { display: flex; min-height: calc(100vh - 58px); }
+
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--navy); padding: 18px 14px;
+}
+.sidebar-nav { display: flex; flex-direction: column; gap: 3px; }
+.sidebar-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  text-decoration: none; color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem; font-weight: 600;
+}
+.sidebar-link:hover { background: rgba(255, 255, 255, 0.06); }
+.sidebar-link.active { background: var(--blue); color: #fff; }
+.sidebar-link .icon { display: inline-flex; }
+
+.content { flex: 1; padding: 26px 28px 60px; max-width: 1100px; }
+
+.page-greeting { font-size: 1.4rem; font-weight: 800; margin-bottom: 18px; }
+.page-subtitle { font-size: 0.85rem; color: var(--text-soft); margin-bottom: 18px; }
+
+/* ---------- module grid: tarjeta con círculo de color por módulo ---------- */
+
+.module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+.module-card {
+  display: block;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; text-decoration: none; color: var(--text); box-shadow: var(--shadow);
+}
+.module-icon {
+  width: 46px; height: 46px; border-radius: 999px; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.module-icon.mod-blue { background: var(--mod-blue); }
+.module-icon.mod-emerald { background: var(--mod-emerald); }
+.module-icon.mod-violet { background: var(--mod-violet); }
+.module-icon.mod-sky { background: var(--mod-sky); }
+.module-icon.mod-orange { background: var(--mod-orange); }
+.module-icon.mod-teal { background: var(--mod-teal); }
+.module-icon.mod-gold { background: var(--mod-gold); }
+
+.module-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.module-desc { font-size: 0.8rem; color: var(--text-soft); line-height: 1.4; }
+.module-status { display: none; } /* solo se muestra en celular, ver media query */
+
+/* ---------- estado vacío / activar notificaciones ---------- */
+
+.empty-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 44px 24px; text-align: center; margin-bottom: 20px;
+}
+.empty-illustration { display: flex; align-items: center; justify-content: center; color: var(--text-faint); margin-bottom: 14px; }
+.empty-card h2 { font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; }
+.empty-card p { font-size: 0.85rem; color: var(--text-soft); max-width: 420px; margin: 0 auto 18px; }
+
+.action-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--blue); color: #fff; border: none; border-radius: 999px;
+  padding: 11px 20px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+
+/* ---------- encabezados de sección + botones secundarios ---------- */
+
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+.section-heading h2, .section-heading span { font-size: 0.95rem; font-weight: 700; }
+.action-secondary {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 14px; font-size: 0.75rem; font-weight: 700; cursor: pointer; color: var(--text);
+}
+
+/* ---------- stats (solo celular, imagen de referencia 3) ---------- */
+
+.stats-row { display: none; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px; box-shadow: var(--shadow);
+}
+.stat-value { font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 0.7rem; color: var(--text-soft); margin-top: 2px; }
+
+/* ---------- opportunity cards (compartidas entre páginas) ---------- */
+
+.card {
+  background: var(--surface); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+  box-shadow: var(--shadow); border-left: 6px solid var(--border);
+}
+.card.participar { border-left-color: var(--green); }
+.card.no_participar { border-left-color: var(--red); }
+.card.revisar { border-left-color: var(--amber); }
+.card.pending-decided { opacity: 0.55; }
+
+.badge {
+  display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 999px; margin-bottom: 8px;
+}
+.badge.participar { background: var(--green-bg); color: var(--green); }
+.badge.no_participar { background: var(--red-bg); color: var(--red); }
+.badge.revisar { background: var(--amber-bg); color: var(--amber); }
+.badge.programada { background: var(--border); color: var(--text-soft); }
+.badge.info { background: #e6ecfe; color: var(--blue); }
+
+.intro-card {
+  font-size: 0.82rem; color: var(--text-soft); background: var(--surface);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;
+}
+
+.act { font-size: 0.75rem; color: var(--text-faint); margin-bottom: 4px; }
+.title { font-size: 0.98rem; font-weight: 700; color: var(--navy); margin-bottom: 6px; line-height: 1.3; }
+.entity { font-size: 0.82rem; color: var(--text-soft); margin-bottom: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.78rem; color: var(--text-soft); margin-bottom: 10px; }
+.meta b { color: var(--navy); }
+.reasoning { font-size: 0.8rem; color: var(--text-soft); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+
+.actions { display: flex; gap: 10px; }
+.actions button {
+  flex: 1; padding: 10px; border-radius: 999px; border: 2px solid var(--border);
+  background: var(--surface); font-weight: 700; font-size: 0.82rem; cursor: pointer; color: var(--text);
+}
+.actions button.yes.active { background: var(--green); border-color: var(--green); color: #fff; }
+.actions button.no.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+.quote-link {
+  display: block; text-align: center; margin-top: 10px; padding: 10px;
+  border-radius: 999px; background: var(--blue); color: #fff; font-weight: 700; font-size: 0.82rem; text-decoration: none;
+}
+
+.empty { text-align: center; color: var(--text-faint); padding: 60px 20px; font-size: 0.9rem; }
+.status-msg { text-align: center; font-size: 0.8rem; color: var(--text-soft); margin: 4px 0 14px; }
+
+/* ---------- legacy quick-action buttons (páginas aún no migradas al shell) ---------- */
+
+.quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 16px 4px; max-width: 640px; margin-left: auto; margin-right: auto; padding-left: 14px; padding-right: 14px; }
+.qa-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; border-radius: 14px; background: var(--surface); text-decoration: none; color: var(--navy); box-shadow: var(--shadow); }
+.qa-icon { font-size: 1.7rem; }
+.qa-label { font-size: 0.68rem; font-weight: 700; }
+
+/* =========================================================
+   Celular (≤768px): tema oscuro, sin sidebar/topbar de escritorio,
+   tarjetas de estado — imagen de referencia 3.
+   ========================================================= */
+
+@media (max-width: 768px) {
+  :root {
+    --bg: #0a0a12;
+    --surface: #14141f;
+    --surface-2: #1b1b2a;
+    --border: #24243a;
+    --text: #f5f6fb;
+    --text-soft: #a9abc4;
+    --text-faint: #6d6f8a;
+  }
+
+  .topbar { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+  .topbar-brand-name { display: none; }
+  .topbar-search { order: 3; flex-basis: 100%; max-width: none; }
+  .topbar-user-role { display: none; }
+
+  .sidebar { display: none; }
+  .app-body { display: block; }
+  .content { padding: 16px 14px 40px; max-width: 100%; }
+  .page-greeting { font-size: 1.15rem; margin-bottom: 12px; }
+
+  .module-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .module-card { padding: 14px; }
+  .module-icon { width: 38px; height: 38px; margin-bottom: 8px; }
+  .module-title { font-size: 0.86rem; }
+  .module-desc { display: none; } /* en celular la tarjeta es compacta: icono + título + estado */
+  .module-status { display: block; font-size: 0.66rem; font-weight: 700; color: var(--text-faint); margin-top: 4px; }
+  .module-status.has-items { color: var(--green); }
+
+  .stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+
+  .empty-card { padding: 32px 18px; }
+}

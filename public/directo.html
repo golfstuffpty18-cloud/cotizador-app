@@ -7,87 +7,54 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/icon-192.png">
 <meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
 <style>
-  :root{
-    --blue:#1616e6; --navy:#0a0a1a;
-    --gray-50:#f5f6fb; --gray-100:#e9eaf5; --gray-400:#8a8ca3; --gray-600:#565873;
-  }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--gray-50); color:#10101f;
-  }
-  header{
-    background: var(--navy); color:#fff; padding:16px 20px;
-    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10;
-  }
-  header a{ color:#fff; text-decoration:none; font-size:1.3rem; }
-  header h1{ font-size:.95rem; margin:0; font-weight:700; flex:1; }
-
-  main{ padding:14px 14px 40px; max-width:640px; margin:0 auto; }
-  section{ background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 10px 24px -16px rgba(10,10,26,.2); }
-  h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-400); margin:0 0 14px; }
+  section{ background:var(--surface); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:var(--shadow); }
+  section h2{ font-size:.85rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); margin:0 0 14px; }
 
   label{ display:block; font-size:.78rem; font-weight:600; color:var(--navy); margin-bottom:5px; }
   input, select{
-    width:100%; padding:10px 12px; border-radius:8px; border:2px solid var(--gray-100);
-    font-size:.88rem; font-family:inherit; margin-bottom:12px;
+    width:100%; padding:10px 12px; border-radius:8px; border:2px solid var(--border);
+    font-size:.88rem; font-family:inherit; margin-bottom:12px; background:var(--surface); color:var(--text);
   }
   input:focus, select:focus{ outline:none; border-color:var(--blue); }
 
   .item-row{ display:grid; grid-template-columns:2fr 1fr 32px; gap:8px; align-items:start; margin-bottom:8px; }
   .item-row input{ margin-bottom:0; }
   .item-row .rm{
-    height:40px; border-radius:8px; border:2px solid var(--gray-100); background:#fff;
+    height:40px; border-radius:8px; border:2px solid var(--border); background:var(--surface);
     color:#c0392b; font-weight:700; cursor:pointer;
   }
 
   .desc-wrap{ position:relative; }
   .sugg-list{
     display:none; position:absolute; top:calc(100% + 2px); left:0; right:0; z-index:20;
-    background:#fff; border:2px solid var(--gray-100); border-radius:10px; overflow:hidden;
+    background:var(--surface); border:2px solid var(--border); border-radius:10px; overflow:hidden;
     max-height:220px; overflow-y:auto; box-shadow:0 14px 28px -12px rgba(10,10,26,.3);
   }
-  .sugg-item{
-    padding:9px 12px; cursor:pointer; font-size:.8rem; border-bottom:1px solid var(--gray-50);
-  }
+  .sugg-item{ padding:9px 12px; cursor:pointer; font-size:.8rem; border-bottom:1px solid var(--border); }
   .sugg-item:last-child{ border-bottom:none; }
-  .sugg-item:hover{ background:var(--gray-50); }
+  .sugg-item:hover{ background:var(--surface-2); }
   .sugg-desc{ color:var(--navy); }
-  .sugg-hint{ font-size:.72rem; color:var(--gray-400); margin:-4px 0 10px; }
+  .sugg-hint{ font-size:.72rem; color:var(--text-faint); margin:-4px 0 10px; }
 
-  .btn{ padding:12px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.86rem; cursor:pointer; }
-  .btn-ghost{ background:#fff; border-color:var(--gray-100); color:var(--navy); width:100%; }
-  .btn-primary{ background:var(--blue); color:#fff; width:100%; }
-  .btn-add{ background:var(--gray-50); border:2px dashed var(--gray-100); color:var(--gray-600); width:100%; margin-bottom:14px; }
+  .df-btn{ padding:12px; border-radius:999px; border:2px solid transparent; font-weight:700; font-size:.86rem; cursor:pointer; }
+  .df-btn-primary{ background:var(--blue); color:#fff; width:100%; }
+  .df-btn-add{ background:var(--surface-2); border:2px dashed var(--border); color:var(--text-soft); width:100%; margin-bottom:14px; }
 
-  .card{
-    background:#fff; border-radius:14px; padding:18px; margin-bottom:14px;
-    box-shadow:0 10px 24px -16px rgba(10,10,26,.25); border-left:6px solid var(--blue);
-  }
-  .badge{
-    display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.04em;
-    text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-bottom:8px;
-    background:#e6ecfe; color:var(--blue);
-  }
-  .card .title{ font-size:.98rem; font-weight:700; color:var(--navy); margin-bottom:6px; }
-  .card .meta{ font-size:.78rem; color:var(--gray-600); margin-bottom:10px; }
-  .quote-link{
-    display:block; text-align:center; margin-top:4px; padding:10px;
-    border-radius:999px; background:var(--blue); color:#fff; font-weight:700; font-size:.82rem; text-decoration:none;
-  }
-  .empty{ text-align:center; color:var(--gray-400); padding:40px 20px; font-size:.9rem; }
-  #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--gray-600); }
+  #msg{ text-align:center; font-size:.82rem; margin-top:10px; min-height:1.2em; color:var(--text-soft); }
 </style>
 </head>
 <body>
-<header>
-  <a href="/">←</a>
-  <h1>Cotizaciones directas</h1>
-  <a href="#" id="btnNueva" title="Nueva cotización directa">＋</a>
-</header>
+<script>window.PAGE_META = { title: 'Cotizaciones directas' };</script>
+<div id="app-shell"></div>
 
-<main>
+<main class="content">
+  <h2 class="section-heading">
+    <span>Cotizaciones directas</span>
+    <a href="#" id="btnNueva" class="action-secondary" title="Nueva cotización directa">＋ Nueva</a>
+  </h2>
+
   <section id="formSection" style="display:none">
     <h2>Nueva cotización directa</h2>
     <label for="titulo">Cliente / título del proyecto</label>
@@ -99,15 +66,17 @@
     <label>Ítems</label>
     <p class="sugg-hint">Al escribir, te sugerimos ítems ya cargados en el catálogo de esta categoría (así el Excel sale con el precio ya sugerido).</p>
     <div id="items"></div>
-    <button type="button" class="btn btn-add" id="btnAddItem">+ Agregar ítem</button>
+    <button type="button" class="df-btn df-btn-add" id="btnAddItem">+ Agregar ítem</button>
 
-    <button type="button" class="btn btn-primary" id="btnCrear">Crear cotización</button>
+    <button type="button" class="df-btn df-btn-primary" id="btnCrear">Crear cotización</button>
     <div id="msg"></div>
   </section>
 
   <div id="list">Cargando…</div>
 </main>
 
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
 <script src="/directo.js"></script>
 </body>
 </html>
