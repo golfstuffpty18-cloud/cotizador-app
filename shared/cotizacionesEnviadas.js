@@ -47,7 +47,10 @@ function normalizarCuadro(raw) {
       nombre: (o.empresa && o.empresa.nombreComercial) || 'Proveedor sin nombre',
       precioTotal: o.precioTotal != null ? Number(o.precioTotal) : null,
     }))
-    .sort((a, b) => (b.precioTotal ?? -Infinity) - (a.precioTotal ?? -Infinity)); // mayor a menor
+    // Menor a mayor: la propuesta #1 es la más barata. Los precios
+    // desconocidos (null) van al final sea cual sea el orden — no se puede
+    // decir que un precio que no se conoce es "el más barato".
+    .sort((a, b) => (a.precioTotal ?? Infinity) - (b.precioTotal ?? Infinity));
 
   return { reconocido: true, proveedores };
 }
