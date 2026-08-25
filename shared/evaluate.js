@@ -24,6 +24,10 @@ const CATEGORY_KEYWORDS = {
   'Control de Acceso': [
     'control de acceso', 'biometri', 'torniquete', 'cerradura electr',
     'barrera vehicular', 'barreras vehiculares',
+    'tarjetas de control de acceso', 'tarjeta de control de acceso',
+    'tarjetas de pvc', 'tarjeta de pvc', 'tarjetas pvc',
+    'tarjetas de proximidad', 'tarjeta de proximidad',
+    'tarjetas mifare', 'tarjeta mifare', 'mifare',
   ],
   'Control de Asistencia': [
     'reloj de marcacion', 'reloj de marcación', 'reloj de asistencia', 'marcador de asistencia',
