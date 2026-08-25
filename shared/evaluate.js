@@ -27,6 +27,8 @@ const CATEGORY_KEYWORDS = {
     'tarjetas de control de acceso', 'tarjeta de control de acceso',
     'tarjetas de pvc', 'tarjeta de pvc', 'tarjetas pvc',
     'tarjetas de proximidad', 'tarjeta de proximidad',
+    'tarjetas de aproximacion', 'tarjetas de aproximación', 'tarjeta de aproximacion', 'tarjeta de aproximación',
+    'tarjetas inteligentes', 'tarjeta inteligente',
     'tarjetas mifare', 'tarjeta mifare', 'mifare',
   ],
   'Control de Asistencia': [
