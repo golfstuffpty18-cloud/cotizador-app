@@ -1,11 +1,14 @@
-// Llena campos en blanco de un formulario (Word) con los datos conocidos de
-// la empresa/representante (shared/companyProfile.js), ANTES de que
-// generateSignedDocument.js busque el nombre del representante y estampe la
-// firma. Mismo patrón que shared/claudeInvoice.js (extracción de facturas):
-// output_config con json_schema, campos opcionales en null en vez de
-// inventados, y una verificación determinística después de la respuesta —
-// acá la verificación es más estricta todavía, porque un dato mal puesto en
-// un documento legal es peor que dejarlo en blanco.
+// Analiza los párrafos de un formulario en Word y decide, para cada campo en
+// blanco, en cuál de tres grupos cae — ANTES de que
+// generateSignedDocument.js lo firme:
+//   1. campos:     dato conocido (empresa/representante) -> se llena directo.
+//   2. pendientes con tipo 'fecha': se llena con la fecha real del día en
+//      que se sube el documento (calculada acá, nunca por el modelo).
+//   3. pendientes con tipo 'dato': no hay forma de saberlo (número de acto,
+//      montos, etc.) -> se le pregunta al usuario antes de firmar.
+// Mismo patrón que shared/claudeInvoice.js: output_config con json_schema,
+// nunca se inventa un valor que no venga de un dato conocido o de la fecha
+// real, y una verificación determinística después de la respuesta.
 const Anthropic = require('@anthropic-ai/sdk');
 const { COMPANY_PROFILE } = require('./companyProfile');
 
@@ -29,29 +32,52 @@ function pareceFormularioEnBlanco(parrafos) {
   return /_{3,}/.test(texto) || /:\s*$/m.test(texto) || /:\s*[_\-]{2,}\s*$/m.test(texto);
 }
 
-const SCHEMA = {
+function formatearFechaHoy() {
+  return new Intl.DateTimeFormat('es-PA', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+}
+
+// Sustitución literal (no String.replace, para que un valor con "$" no se
+// interprete como patrón de reemplazo).
+function aplicarPlantilla(plantilla, valor) {
+  return plantilla.split('{{RESPUESTA}}').join(valor);
+}
+
+const CAMPO_ITEM = {
   type: 'object',
   properties: {
-    campos: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          indice: { type: 'integer', description: 'Índice (empezando en 0) del párrafo en la lista que se le dio.' },
-          textoOriginal: { type: 'string', description: 'El texto EXACTO de ese párrafo tal como se le dio, sin modificar — se usa para verificar que no se confundió de párrafo.' },
-          textoLleno: { type: 'string', description: 'El mismo párrafo, con el espacio en blanco reemplazado por el dato conocido correspondiente.' },
-        },
-        required: ['indice', 'textoOriginal', 'textoLleno'],
-        additionalProperties: false,
-      },
-    },
+    indice: { type: 'integer', description: 'Índice (empezando en 0) del párrafo en la lista que se le dio.' },
+    textoOriginal: { type: 'string', description: 'El texto EXACTO de ese párrafo tal como se le dio, sin modificar.' },
+    textoLleno: { type: 'string', description: 'El mismo párrafo, con el espacio en blanco reemplazado por el dato conocido correspondiente.' },
   },
-  required: ['campos'],
+  required: ['indice', 'textoOriginal', 'textoLleno'],
   additionalProperties: false,
 };
 
-async function fillFormFields(parrafos) {
-  if (!pareceFormularioEnBlanco(parrafos)) return [];
+const PENDIENTE_ITEM = {
+  type: 'object',
+  properties: {
+    indice: { type: 'integer', description: 'Índice (empezando en 0) del párrafo en la lista que se le dio.' },
+    textoOriginal: { type: 'string', description: 'El texto EXACTO de ese párrafo tal como se le dio, sin modificar.' },
+    tipo: { type: 'string', enum: ['fecha', 'dato'], description: '"fecha" si el espacio en blanco pide la fecha del día (fecha del trámite, fecha de solicitud, etc.). "dato" para cualquier otro dato que no se pueda saber de antemano (número de acto, montos, etc.).' },
+    etiqueta: { type: 'string', description: 'Nombre corto y claro de qué dato se está pidiendo, para mostrárselo al usuario (ej: "Número de acto"). Para tipo "fecha" puede repetir el texto del campo.' },
+    plantilla: { type: 'string', description: 'El mismo párrafo con el espacio en blanco reemplazado EXACTAMENTE por el texto literal {{RESPUESTA}} (una sola vez), manteniendo el resto del texto igual, para poder insertar el valor ahí después.' },
+  },
+  required: ['indice', 'textoOriginal', 'tipo', 'etiqueta', 'plantilla'],
+  additionalProperties: false,
+};
+
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    campos: { type: 'array', items: CAMPO_ITEM },
+    pendientes: { type: 'array', items: PENDIENTE_ITEM },
+  },
+  required: ['campos', 'pendientes'],
+  additionalProperties: false,
+};
+
+async function analyzeFormFields(parrafos) {
+  if (!pareceFormularioEnBlanco(parrafos)) return { campos: [], pendientes: [] };
 
   const listaParrafos = parrafos.map((p, i) => `[${i}] ${p}`).join('\n');
 
@@ -64,37 +90,50 @@ async function fillFormFields(parrafos) {
       content: [{
         type: 'text',
         text: `Este es el texto de un formulario en Word, dividido en párrafos numerados. Algunos párrafos tienen un espacio en blanco por llenar (líneas terminadas en ":", guiones bajos "___", o similar).\n\n` +
-          `Estos son los ÚNICOS datos que puedes usar para llenar campos — nunca ningún otro dato:\n${JSON.stringify(COMPANY_PROFILE, null, 2)}\n\n` +
+          `Estos son los ÚNICOS datos conocidos de la empresa y su representante:\n${JSON.stringify(COMPANY_PROFILE, null, 2)}\n\n` +
           `Párrafos del documento:\n${listaParrafos}\n\n` +
-          'Para cada párrafo que tenga un espacio en blanco que puedas llenar con ALGUNO de esos datos conocidos (nombre de la empresa, dirección, teléfono, RUC, correo, nombre del representante, su cargo, o su cédula), agrega un ítem con el índice de ese párrafo, el texto original exacto, y el texto ya lleno.\n\n' +
-          'MUY IMPORTANTE: si un párrafo pide un dato que NO está en la lista de arriba (una fecha de trámite, un número de acto, una cédula distinta a la del representante, un monto, cualquier cosa que no esté ahí), NO LO INCLUYAS en tu respuesta — omite ese párrafo por completo. Nunca inventes, asumas ni completes con un valor que no venga literal de esos datos conocidos. Si un párrafo ya está lleno (no tiene ningún espacio en blanco), tampoco lo incluyas.',
+          'Clasifica cada párrafo con un espacio en blanco por llenar en uno de estos tres grupos:\n\n' +
+          '1) "campos": el espacio en blanco pide un dato que SÍ está en la lista de datos conocidos de arriba (nombre de la empresa, dirección, teléfono, RUC, correo, nombre del representante, su cargo, o su cédula). Agrega el índice, el texto original exacto, y el texto ya lleno con ese dato.\n\n' +
+          '2) "pendientes" con tipo "fecha": el espacio en blanco pide la fecha en que se llena o se firma el documento (ej. "Fecha:", "Fecha del trámite:", "Fecha de solicitud:"). NO escribas ninguna fecha tú mismo — solo marca el párrafo con tipo "fecha" y en "plantilla" pon el mismo texto pero con el espacio en blanco reemplazado exactamente por el texto literal {{RESPUESTA}} una sola vez (el sistema pondrá ahí la fecha real del día).\n\n' +
+          '3) "pendientes" con tipo "dato": el espacio en blanco pide cualquier otro dato que NO está en la lista de datos conocidos (número de acto, montos, fechas de eventos que no son "hoy", cédulas distintas a la del representante, cualquier cosa que no esté literal en la lista). Agrega el índice, el texto original exacto, una "etiqueta" corta describiendo qué se pide (ej: "Número de acto"), y una "plantilla" igual que en el caso de fecha (el mismo texto con el espacio en blanco reemplazado exactamente por {{RESPUESTA}} una sola vez).\n\n' +
+          'MUY IMPORTANTE: nunca inventes, asumas ni completes un dato con un valor que no venga literal de la lista de datos conocidos. Si un párrafo ya está lleno (no tiene ningún espacio en blanco), no lo incluyas en ninguna lista.',
       }],
     }],
   });
 
   if (response.stop_reason === 'refusal') {
-    return [];
+    return { campos: [], pendientes: [] };
   }
 
   const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock) return [];
+  if (!textBlock) return { campos: [], pendientes: [] };
 
-  let campos;
+  let parsed;
   try {
-    campos = JSON.parse(textBlock.text).campos || [];
+    parsed = JSON.parse(textBlock.text);
   } catch (err) {
-    return [];
+    return { campos: [], pendientes: [] };
   }
 
   // Verificación determinística: si el texto original que Claude reporta no
   // coincide EXACTO con el párrafo real en ese índice, se descarta ese
   // ítem — mejor no tocar un párrafo que tocar el equivocado.
-  return campos.filter((c) => {
-    return typeof c.indice === 'number'
-      && parrafos[c.indice] === c.textoOriginal
-      && typeof c.textoLleno === 'string'
-      && c.textoLleno.length > 0;
-  });
+  const campos = (parsed.campos || []).filter((c) => (
+    typeof c.indice === 'number'
+    && parrafos[c.indice] === c.textoOriginal
+    && typeof c.textoLleno === 'string'
+    && c.textoLleno.length > 0
+  ));
+
+  const pendientes = (parsed.pendientes || []).filter((p) => (
+    typeof p.indice === 'number'
+    && parrafos[p.indice] === p.textoOriginal
+    && (p.tipo === 'fecha' || p.tipo === 'dato')
+    && typeof p.etiqueta === 'string' && p.etiqueta.trim().length > 0
+    && typeof p.plantilla === 'string' && p.plantilla.includes('{{RESPUESTA}}')
+  ));
+
+  return { campos, pendientes };
 }
 
-module.exports = { fillFormFields, pareceFormularioEnBlanco };
+module.exports = { analyzeFormFields, pareceFormularioEnBlanco, formatearFechaHoy, aplicarPlantilla };

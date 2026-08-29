@@ -562,13 +562,28 @@ app.post('/api/documentos/autenticar', upload.single('file'), async (req, res) =
     || req.file.originalname.toLowerCase().endsWith('.docx');
   if (!esDocx) return res.status(400).json({ error: 'Solo se aceptan archivos .docx (Word).' });
 
-  let pdfBuffer, nombreEncontrado;
+  let respuestas = null;
+  if (req.body.respuestas) {
+    try {
+      respuestas = JSON.parse(req.body.respuestas);
+    } catch (err) {
+      return res.status(400).json({ error: 'Formato de respuestas inválido.' });
+    }
+  }
+
+  let resultado;
   try {
-    ({ pdfBuffer, nombreEncontrado } = await signDocument(req.file.buffer));
+    resultado = await signDocument(req.file.buffer, respuestas);
   } catch (err) {
     console.error('Error autenticando documento:', err);
     return res.status(500).json({ error: 'No se pudo procesar el documento. Verifica que sea un .docx válido.' });
   }
+
+  if (resultado.requierePendientes) {
+    return res.status(200).json({ requierePendientes: true, pendientes: resultado.pendientes });
+  }
+
+  const { pdfBuffer, nombreEncontrado } = resultado;
 
   // filename*=UTF-8'' (RFC 5987) para que acentos/ñ en el nombre original no
   // rompan el header — el navegador lo decodifica igual al descargar.

@@ -19,6 +19,13 @@
   .resultado-card.show{ display:block; }
   .aviso-revisar{ background:var(--amber-bg); color:var(--amber); font-size:.82rem; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
   .aviso-ok{ background:var(--green-bg); color:var(--green); font-size:.82rem; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
+  .pendientes-card{ display:none; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:14px; }
+  .pendientes-card.show{ display:block; }
+  .pendientes-card h2{ font-size:1rem; margin:0 0 6px; color:var(--text); }
+  .pendientes-intro{ color:var(--text-soft); font-size:.82rem; margin:0 0 14px; }
+  .campo-pendiente{ margin-bottom:12px; }
+  .campo-pendiente label{ display:block; font-size:.78rem; font-weight:700; color:var(--text-soft); margin-bottom:5px; }
+  .campo-pendiente input{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:.88rem; }
 </style>
 </head>
 <body>
@@ -26,7 +33,7 @@
 <div id="app-shell"></div>
 
 <main class="content">
-  <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema busca dónde aparece el nombre del representante legal y estampa ahí la firma digital, la misma que ya usan los PDF de cotización. Descargas un PDF final, listo para enviar.</p>
+  <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema llena los campos en blanco con los datos de la empresa y busca dónde aparece el nombre del representante legal para estampar ahí la firma digital, la misma que ya usan los PDF de cotización. Si el formulario pide algún dato que no tenemos guardado, te lo preguntamos antes de firmar. Descargas un PDF final, listo para enviar.</p>
 
   <label class="file-drop" id="fileDrop">
     <span data-icon="upload" data-icon-size="22" style="display:block;margin-bottom:8px"></span>
@@ -35,6 +42,15 @@
   </label>
 
   <div id="status" class="status-msg"></div>
+
+  <div class="pendientes-card" id="pendientesCard">
+    <h2>Antes de firmar, completa estos datos</h2>
+    <p class="pendientes-intro">El documento pide información que no tenemos guardada. Complétala y el sistema termina de llenar y firmar el documento.</p>
+    <form id="pendientesForm">
+      <div id="pendientesCampos"></div>
+      <button type="submit" class="action-primary" data-icon="sign">Continuar y firmar</button>
+    </form>
+  </div>
 
   <div class="resultado-card empty-card" id="resultadoCard">
     <div class="empty-illustration" data-icon="sign" data-icon-size="36"></div>

@@ -3,7 +3,7 @@ const path = require('path');
 const mammoth = require('mammoth');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
-const { fillFormFields } = require('./fillFormFields');
+const { analyzeFormFields, formatearFechaHoy, aplicarPlantilla } = require('./fillFormFields');
 
 // Mismo archivo que ya usa shared/generateQuotePdf.js para las cotizaciones
 // — no se duplica el activo, solo se reutiliza.
@@ -41,20 +41,51 @@ function firmaHtml() {
 // párrafo donde aparece el nombre del representante legal — o al final del
 // documento si el nombre no aparece en ningún lado (nombreEncontrado:false,
 // para que la pantalla se lo avise al usuario y revise dónde quedó).
-async function signDocument(docxBuffer) {
+//
+// Antes de firmar, intenta llenar los campos en blanco del formulario (ver
+// shared/fillFormFields.js):
+//  - datos conocidos de la empresa/representante -> se llenan directo.
+//  - fechas -> se llenan con la fecha real del día en que se sube el
+//    documento.
+//  - cualquier otro dato que no se pueda saber de antemano (número de acto,
+//    etc.) -> si no se le pasó `respuestas`, se detiene ACÁ y devuelve
+//    { requierePendientes:true, pendientes } para que la pantalla se lo
+//    pregunte al usuario antes de generar el PDF. El caller vuelve a llamar
+//    a signDocument con las respuestas para terminar de firmar.
+async function signDocument(docxBuffer, respuestas = null) {
   const { value: html } = await mammoth.convertToHtml({ buffer: docxBuffer });
   const $ = cheerio.load(html);
   const body = $('body');
 
-  // Antes de firmar, intenta llenar campos en blanco (nombre de la empresa,
-  // RUC, representante, etc.) con los datos conocidos de companyProfile.js.
-  // Si el documento ya está lleno, o el campo pide un dato que no tenemos,
-  // no se toca nada — ver shared/fillFormFields.js.
   const parrafos = body.children().toArray().map((el) => $(el).text());
-  const llenados = await fillFormFields(parrafos);
-  llenados.forEach(({ indice, textoLleno }) => {
+  const { campos, pendientes } = await analyzeFormFields(parrafos);
+  const pendientesDato = pendientes.filter((p) => p.tipo === 'dato');
+  const pendientesFecha = pendientes.filter((p) => p.tipo === 'fecha');
+
+  if (!respuestas && pendientesDato.length > 0) {
+    return {
+      requierePendientes: true,
+      pendientes: pendientesDato.map(({ indice, etiqueta }) => ({ indice, etiqueta })),
+    };
+  }
+
+  campos.forEach(({ indice, textoLleno }) => {
     $(body.children().get(indice)).text(textoLleno);
   });
+
+  const fechaHoy = formatearFechaHoy();
+  pendientesFecha.forEach((p) => {
+    $(body.children().get(p.indice)).text(aplicarPlantilla(p.plantilla, fechaHoy));
+  });
+
+  if (respuestas) {
+    pendientesDato.forEach((p) => {
+      const valor = respuestas[String(p.indice)];
+      if (valor && parrafos[p.indice] === p.textoOriginal) {
+        $(body.children().get(p.indice)).text(aplicarPlantilla(p.plantilla, valor));
+      }
+    });
+  }
 
   const firma = firmaHtml();
   let nombreEncontrado = false;
