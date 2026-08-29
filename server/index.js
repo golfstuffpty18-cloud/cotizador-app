@@ -583,13 +583,13 @@ app.post('/api/documentos/autenticar', upload.single('file'), async (req, res) =
     return res.status(200).json({ requierePendientes: true, pendientes: resultado.pendientes });
   }
 
-  const { pdfBuffer, nombreEncontrado } = resultado;
+  const { pdfBuffer, colocacion } = resultado;
 
   // filename*=UTF-8'' (RFC 5987) para que acentos/ñ en el nombre original no
   // rompan el header — el navegador lo decodifica igual al descargar.
   const nombreBase = req.file.originalname.replace(/\.docx$/i, '') + ' - firmado.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('X-Nombre-Encontrado', String(nombreEncontrado));
+  res.set('X-Firma-Colocacion', colocacion);
   res.set('Content-Disposition', `attachment; filename="documento-firmado.pdf"; filename*=UTF-8''${encodeURIComponent(nombreBase)}`);
   res.send(pdfBuffer);
 });

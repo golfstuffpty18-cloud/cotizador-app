@@ -32,8 +32,14 @@ function pareceFormularioEnBlanco(parrafos) {
   return /_{3,}/.test(texto) || /:\s*$/m.test(texto) || /:\s*[_\-]{2,}\s*$/m.test(texto);
 }
 
-function formatearFechaHoy() {
-  return new Intl.DateTimeFormat('es-PA', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+// Cuánto de la fecha hay que escribir depende de si el año ya aparece fijo
+// en el documento (ej. "___ de 2026") o si el blanco pide la fecha completa
+// — por eso lo decide analyzeFormFields por cada caso, no un formato único.
+function formatearFechaHoy(formato) {
+  const opciones = formato === 'dia_mes'
+    ? { day: 'numeric', month: 'long' }
+    : { day: 'numeric', month: 'long', year: 'numeric' };
+  return new Intl.DateTimeFormat('es-PA', opciones).format(new Date());
 }
 
 // Sustitución literal (no String.replace, para que un valor con "$" no se
@@ -59,10 +65,14 @@ const PENDIENTE_ITEM = {
     indice: { type: 'integer', description: 'Índice (empezando en 0) del párrafo en la lista que se le dio.' },
     textoOriginal: { type: 'string', description: 'El texto EXACTO de ese párrafo tal como se le dio, sin modificar.' },
     tipo: { type: 'string', enum: ['fecha', 'dato'], description: '"fecha" si el espacio en blanco pide la fecha del día (fecha del trámite, fecha de solicitud, etc.). "dato" para cualquier otro dato que no se pueda saber de antemano (número de acto, montos, etc.).' },
+    formatoFecha: {
+      anyOf: [{ type: 'string', enum: ['dia_mes', 'dia_mes_anio'] }, { type: 'null' }],
+      description: 'Solo para tipo "fecha": "dia_mes" si el año YA aparece como texto fijo justo después del blanco (ej: "___ de 2026", el blanco solo pide día y mes). "dia_mes_anio" si el blanco pide la fecha completa, año incluido. null si tipo es "dato".',
+    },
     etiqueta: { type: 'string', description: 'Nombre corto y claro de qué dato se está pidiendo, para mostrárselo al usuario (ej: "Número de acto"). Para tipo "fecha" puede repetir el texto del campo.' },
     plantilla: { type: 'string', description: 'El mismo párrafo con el espacio en blanco reemplazado EXACTAMENTE por el texto literal {{RESPUESTA}} (una sola vez), manteniendo el resto del texto igual, para poder insertar el valor ahí después.' },
   },
-  required: ['indice', 'textoOriginal', 'tipo', 'etiqueta', 'plantilla'],
+  required: ['indice', 'textoOriginal', 'tipo', 'formatoFecha', 'etiqueta', 'plantilla'],
   additionalProperties: false,
 };
 
@@ -93,9 +103,9 @@ async function analyzeFormFields(parrafos) {
           `Estos son los ÚNICOS datos conocidos de la empresa y su representante:\n${JSON.stringify(COMPANY_PROFILE, null, 2)}\n\n` +
           `Párrafos del documento:\n${listaParrafos}\n\n` +
           'Clasifica cada párrafo con un espacio en blanco por llenar en uno de estos tres grupos:\n\n' +
-          '1) "campos": el espacio en blanco pide un dato que SÍ está en la lista de datos conocidos de arriba (nombre de la empresa, dirección, teléfono, RUC, correo, nombre del representante, su cargo, o su cédula). Agrega el índice, el texto original exacto, y el texto ya lleno con ese dato.\n\n' +
-          '2) "pendientes" con tipo "fecha": el espacio en blanco pide la fecha en que se llena o se firma el documento (ej. "Fecha:", "Fecha del trámite:", "Fecha de solicitud:"). NO escribas ninguna fecha tú mismo — solo marca el párrafo con tipo "fecha" y en "plantilla" pon el mismo texto pero con el espacio en blanco reemplazado exactamente por el texto literal {{RESPUESTA}} una sola vez (el sistema pondrá ahí la fecha real del día).\n\n' +
-          '3) "pendientes" con tipo "dato": el espacio en blanco pide cualquier otro dato que NO está en la lista de datos conocidos (número de acto, montos, fechas de eventos que no son "hoy", cédulas distintas a la del representante, cualquier cosa que no esté literal en la lista). Agrega el índice, el texto original exacto, una "etiqueta" corta describiendo qué se pide (ej: "Número de acto"), y una "plantilla" igual que en el caso de fecha (el mismo texto con el espacio en blanco reemplazado exactamente por {{RESPUESTA}} una sola vez).\n\n' +
+          '1) "campos": el espacio en blanco pide un dato que SÍ está en la lista de datos conocidos de arriba (nombre de la empresa, dirección, teléfono, RUC, número de aviso de operación, correo, nombre del representante, su cargo, o su cédula). Agrega el índice, el texto original exacto, y el texto ya lleno con ese dato.\n\n' +
+          '2) "pendientes" con tipo "fecha": el espacio en blanco pide la fecha en que se llena o se firma el documento (ej. "Fecha:", "Fecha del trámite:", "Fecha de solicitud:", "Panamá, ___ de 2026"). NO escribas ninguna fecha tú mismo — solo marca el párrafo con tipo "fecha" y en "plantilla" pon el mismo texto pero con el espacio en blanco reemplazado exactamente por el texto literal {{RESPUESTA}} una sola vez (el sistema pondrá ahí la fecha real del día). Fíjate bien si el AÑO ya aparece escrito justo después del blanco (ej: "___ de 2026") — en ese caso usa formatoFecha:"dia_mes" para que el sistema no repita el año; si el blanco pide la fecha completa usa formatoFecha:"dia_mes_anio".\n\n' +
+          '3) "pendientes" con tipo "dato": el espacio en blanco pide cualquier otro dato que NO está en la lista de datos conocidos (número de acto, montos, fechas de eventos que no son "hoy", cédulas distintas a la del representante, cualquier cosa que no esté literal en la lista). Agrega el índice, el texto original exacto, una "etiqueta" corta describiendo qué se pide (ej: "Número de acto"), formatoFecha:null (no aplica), y una "plantilla" igual que en el caso de fecha (el mismo texto con el espacio en blanco reemplazado exactamente por {{RESPUESTA}} una sola vez).\n\n' +
           'MUY IMPORTANTE: nunca inventes, asumas ni completes un dato con un valor que no venga literal de la lista de datos conocidos. Si un párrafo ya está lleno (no tiene ningún espacio en blanco), no lo incluyas en ninguna lista.',
       }],
     }],

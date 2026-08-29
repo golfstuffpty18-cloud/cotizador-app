@@ -8,7 +8,14 @@ const pendientesForm = document.getElementById('pendientesForm');
 const resultadoCard = document.getElementById('resultadoCard');
 const resultadoTitulo = document.getElementById('resultadoTitulo');
 const resultadoAviso = document.getElementById('resultadoAviso');
-const descargarDeNuevoBtn = document.getElementById('descargarDeNuevoBtn');
+const previewFrame = document.getElementById('previewFrame');
+const descargarBtn = document.getElementById('descargarBtn');
+
+const AVISOS_COLOCACION = {
+  'linea-en-blanco': '<div class="aviso-ok">✅ Se firmó justo en la línea de firma del documento — nada más se movió de su lugar.</div>',
+  'nombre-representante': '<div class="aviso-revisar">⚠️ El documento no tiene una línea de firma dedicada — se agregó la firma justo después del nombre del representante legal. Revisa que quede bien ubicada.</div>',
+  'final-documento': '<div class="aviso-revisar">⚠️ No se encontró una línea de firma ni el nombre del representante legal — la firma se agregó al final del documento. Revisa que quede bien ubicada.</div>',
+};
 
 let ultimoResultado = null; // { blobUrl, nombreArchivo }
 let archivoActual = null;
@@ -40,9 +47,9 @@ async function enviarDocumento(file, respuestas) {
   if (tipo.includes('application/json')) {
     return { tipo: 'json', data: await res.json() };
   }
-  const nombreEncontrado = res.headers.get('X-Nombre-Encontrado') === 'true';
+  const colocacion = res.headers.get('X-Firma-Colocacion');
   const blob = await res.blob();
-  return { tipo: 'pdf', blob, nombreEncontrado };
+  return { tipo: 'pdf', blob, colocacion };
 }
 
 function renderPendientesForm(pendientes) {
@@ -67,18 +74,18 @@ function renderPendientesForm(pendientes) {
   pendientesCard.classList.add('show');
 }
 
+// No se descarga automático — se muestra el PDF aquí mismo (iframe) para
+// que se apruebe antes de bajarlo, tal como pidió el usuario.
 function mostrarResultado(resultado, nombreOriginal) {
   const blobUrl = URL.createObjectURL(resultado.blob);
   const nombreArchivo = nombreOriginal.replace(/\.docx$/i, '') + ' - firmado.pdf';
 
   ultimoResultado = { blobUrl, nombreArchivo };
-  descargar(blobUrl, nombreArchivo);
+  previewFrame.src = blobUrl;
 
   statusEl.textContent = '';
-  resultadoTitulo.textContent = 'Documento firmado';
-  resultadoAviso.innerHTML = resultado.nombreEncontrado
-    ? '<div class="aviso-ok">✅ Se encontró el nombre del representante legal y la firma quedó justo ahí.</div>'
-    : '<div class="aviso-revisar">⚠️ No se encontró el nombre del representante legal en el texto — la firma se colocó al final del documento. Revisa que quede bien ubicada.</div>';
+  resultadoTitulo.textContent = 'Revisa el documento antes de descargar';
+  resultadoAviso.innerHTML = AVISOS_COLOCACION[resultado.colocacion] || '';
   resultadoCard.classList.add('show');
 }
 
@@ -87,6 +94,7 @@ async function procesarArchivo(file) {
   archivoActual = file;
   resultadoCard.classList.remove('show');
   pendientesCard.classList.remove('show');
+  previewFrame.src = 'about:blank';
   statusEl.textContent = `Procesando "${file.name}"… puede tardar unos segundos.`;
 
   try {
@@ -129,7 +137,7 @@ pendientesForm.addEventListener('submit', async (e) => {
 
 fileInput.addEventListener('change', () => procesarArchivo(fileInput.files[0]));
 
-descargarDeNuevoBtn.addEventListener('click', () => {
+descargarBtn.addEventListener('click', () => {
   if (ultimoResultado) descargar(ultimoResultado.blobUrl, ultimoResultado.nombreArchivo);
 });
 

@@ -26,6 +26,9 @@
   .campo-pendiente{ margin-bottom:12px; }
   .campo-pendiente label{ display:block; font-size:.78rem; font-weight:700; color:var(--text-soft); margin-bottom:5px; }
   .campo-pendiente input{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:.88rem; }
+  .resultado-card h2{ font-size:1rem; margin:0 0 10px; color:var(--text); }
+  .preview-frame-wrap{ border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:14px; }
+  .preview-frame{ display:block; width:100%; height:70vh; border:0; background:#525659; }
 </style>
 </head>
 <body>
@@ -33,7 +36,7 @@
 <div id="app-shell"></div>
 
 <main class="content">
-  <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema llena los campos en blanco con los datos de la empresa y busca dónde aparece el nombre del representante legal para estampar ahí la firma digital, la misma que ya usan los PDF de cotización. Si el formulario pide algún dato que no tenemos guardado, te lo preguntamos antes de firmar. Descargas un PDF final, listo para enviar.</p>
+  <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema llena los campos en blanco con los datos de la empresa, sin mover el texto de su lugar original, y estampa la firma digital en la línea de firma del documento (o donde aparece el nombre del representante legal si no hay una línea dedicada). Si el formulario pide algún dato que no tenemos guardado, te lo preguntamos antes de firmar. Antes de descargar, puedes revisar el PDF final aquí mismo.</p>
 
   <label class="file-drop" id="fileDrop">
     <span data-icon="upload" data-icon-size="22" style="display:block;margin-bottom:8px"></span>
@@ -52,11 +55,13 @@
     </form>
   </div>
 
-  <div class="resultado-card empty-card" id="resultadoCard">
-    <div class="empty-illustration" data-icon="sign" data-icon-size="36"></div>
-    <h2 id="resultadoTitulo">Documento firmado</h2>
+  <div class="resultado-card" id="resultadoCard">
+    <h2 id="resultadoTitulo">Revisa el documento antes de descargar</h2>
     <div id="resultadoAviso"></div>
-    <button type="button" class="action-secondary" id="descargarDeNuevoBtn" data-icon="upload">Descargar de nuevo</button>
+    <div class="preview-frame-wrap">
+      <iframe id="previewFrame" class="preview-frame" title="Vista previa del documento firmado"></iframe>
+    </div>
+    <button type="button" class="action-primary" id="descargarBtn" data-icon="upload">Descargar PDF</button>
   </div>
 </main>
 

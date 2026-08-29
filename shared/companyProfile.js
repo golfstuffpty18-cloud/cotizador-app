@@ -10,6 +10,7 @@ const COMPANY_PROFILE = {
     telefono: '6948-1130',
     ruc: '155667603-2-2018 DV 95',
     correo: 'd.sanchezv@gstechnologiespty.com',
+    avisoOperacion: '155667603-2-2018/2018-594062',
   },
   representante: {
     nombre: 'Ing. Dionisio Sánchez',

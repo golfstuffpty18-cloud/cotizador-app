@@ -24,11 +24,26 @@ function contieneNombreRepresentante(texto) {
   return normalizar(texto).includes(NOMBRE_REPRESENTANTE);
 }
 
-function firmaHtml() {
+// La línea de firma en blanco de un documento legal ("____________", sin
+// nada más en ese párrafo) — el lugar exacto donde el documento espera la
+// firma. Se detecta para reemplazarla EN EL MISMO SITIO, sin agregar ni
+// mover ningún otro párrafo del documento.
+function esLineaDeFirma(texto) {
+  return /^_{4,}$/.test((texto || '').trim());
+}
+
+function firmaImgHtml() {
   const base64 = fs.readFileSync(FIRMA_PATH).toString('base64');
+  // Mismo tamaño validado en la app local con Word: ancho suficiente para
+  // cubrir el nombre del representante, sin quedar chica ni encimarse con
+  // el texto de arriba/abajo.
+  return `<img src="data:image/png;base64,${base64}" style="height:113px; width:160px; display:block;">`;
+}
+
+function firmaBloqueHtml() {
   return `
     <div style="margin-top:18px;">
-      <img src="data:image/png;base64,${base64}" style="height:70px; display:block;">
+      ${firmaImgHtml()}
       <div style="border-top:1px solid #cccccc; width:220px; margin-top:2px;"></div>
       <div style="font-family:Helvetica,Arial,sans-serif; font-weight:bold; font-size:11pt; color:#0a0a1a; margin-top:6px;">Ing. Dionisio Sánchez</div>
       <div style="font-family:Helvetica,Arial,sans-serif; font-size:10pt; color:#565873;">Representante Legal</div>
@@ -37,10 +52,17 @@ function firmaHtml() {
 }
 
 // Recibe el buffer de un .docx cualquiera (formato variable, no una
-// plantilla fija) y devuelve un PDF con la firma estampada justo después del
-// párrafo donde aparece el nombre del representante legal — o al final del
-// documento si el nombre no aparece en ningún lado (nombreEncontrado:false,
-// para que la pantalla se lo avise al usuario y revise dónde quedó).
+// plantilla fija) y devuelve un PDF firmado, respetando la estructura
+// original del documento — es un documento legal, no se reordena ni se
+// mueve texto de su lugar. La firma se coloca según esta prioridad:
+//   1. 'linea-en-blanco': el documento ya tiene una línea de firma dedicada
+//      ("____________", sola en su propio párrafo) — se reemplaza EN ESE
+//      MISMO párrafo por la imagen de la firma, sin tocar nada más.
+//   2. 'nombre-representante': no hay línea dedicada, pero el nombre del
+//      representante aparece en el texto — se agrega el bloque de firma
+//      justo después de esa última aparición (única señal disponible).
+//   3. 'final-documento': no se encontró ninguna de las dos — se agrega al
+//      final, para que la pantalla avise que hay que revisar dónde quedó.
 //
 // Antes de firmar, intenta llenar los campos en blanco del formulario (ver
 // shared/fillFormFields.js):
@@ -73,8 +95,8 @@ async function signDocument(docxBuffer, respuestas = null) {
     $(body.children().get(indice)).text(textoLleno);
   });
 
-  const fechaHoy = formatearFechaHoy();
   pendientesFecha.forEach((p) => {
+    const fechaHoy = formatearFechaHoy(p.formatoFecha);
     $(body.children().get(p.indice)).text(aplicarPlantilla(p.plantilla, fechaHoy));
   });
 
@@ -87,26 +109,38 @@ async function signDocument(docxBuffer, respuestas = null) {
     });
   }
 
-  const firma = firmaHtml();
+  let colocacion;
 
-  // La ÚLTIMA aparición del nombre, no la primera: ahora que se llenan
-  // campos en blanco, el nombre del representante puede aparecer también en
-  // una frase temprana del documento (ej. "Yo, Ing. Dionisio Sánchez,
-  // portador de la cédula..."), antes del bloque de firma real que casi
-  // siempre está al final. Si solo aparece una vez (el caso más común),
-  // última y primera son la misma.
-  let elementoFirma = null;
-  for (const el of body.children().toArray()) {
-    if (contieneNombreRepresentante($(el).text())) {
-      elementoFirma = el;
-    }
-  }
+  let lineaFirma = null;
+  body.children().toArray().forEach((el) => {
+    if (esLineaDeFirma($(el).text())) lineaFirma = el;
+  });
 
-  const nombreEncontrado = elementoFirma !== null;
-  if (elementoFirma) {
-    $(elementoFirma).after(firma);
+  if (lineaFirma) {
+    // Reemplaza el contenido de ESE MISMO párrafo — no se agrega, no se
+    // mueve, no se elimina ningún otro elemento del documento.
+    $(lineaFirma).html(firmaImgHtml());
+    colocacion = 'linea-en-blanco';
   } else {
-    body.append(firma);
+    // Sin línea dedicada: última aparición del nombre del representante, no
+    // la primera — ahora que se llenan campos en blanco, el nombre puede
+    // aparecer también en una frase temprana del documento (ej. "Yo, Ing.
+    // Dionisio Sánchez, portador de la cédula..."), antes del bloque de
+    // firma real que casi siempre está al final.
+    let elementoFirma = null;
+    for (const el of body.children().toArray()) {
+      if (contieneNombreRepresentante($(el).text())) {
+        elementoFirma = el;
+      }
+    }
+
+    if (elementoFirma) {
+      $(elementoFirma).after(firmaBloqueHtml());
+      colocacion = 'nombre-representante';
+    } else {
+      body.append(firmaBloqueHtml());
+      colocacion = 'final-documento';
+    }
   }
 
   const documentoHtml = `<!DOCTYPE html>
@@ -135,7 +169,7 @@ async function signDocument(docxBuffer, respuestas = null) {
       margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
     });
     const pdfBuffer = Buffer.from(pdfBytes);
-    return { pdfBuffer, nombreEncontrado };
+    return { pdfBuffer, colocacion };
   } finally {
     await browser.close();
   }
