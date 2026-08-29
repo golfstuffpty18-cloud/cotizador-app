@@ -24,6 +24,7 @@ const { uploadToDropboxSafe, dropboxSubfolderFor } = require('../shared/dropboxU
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
 const { extractInvoiceData } = require('../shared/claudeInvoice');
+const { signDocument } = require('../shared/generateSignedDocument');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -548,6 +549,34 @@ app.post('/api/finanzas/extraer', uploadFactura.single('file'), async (req, res)
     archivo_tipo: req.file.mimetype,
     archivo_base64: req.file.buffer.toString('base64'),
   });
+});
+
+// ---- Autenticar documentos ----
+// Sube un Word (.docx) cualquiera, busca dónde aparece el nombre del
+// representante legal y estampa ahí la misma firma que ya usan las
+// cotizaciones (shared/generateSignedDocument.js) — no toca la base de
+// datos, todo ocurre en memoria (buffer entra, PDF sale).
+app.post('/api/documentos/autenticar', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'no se recibió ningún archivo' });
+  const esDocx = req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    || req.file.originalname.toLowerCase().endsWith('.docx');
+  if (!esDocx) return res.status(400).json({ error: 'Solo se aceptan archivos .docx (Word).' });
+
+  let pdfBuffer, nombreEncontrado;
+  try {
+    ({ pdfBuffer, nombreEncontrado } = await signDocument(req.file.buffer));
+  } catch (err) {
+    console.error('Error autenticando documento:', err);
+    return res.status(500).json({ error: 'No se pudo procesar el documento. Verifica que sea un .docx válido.' });
+  }
+
+  // filename*=UTF-8'' (RFC 5987) para que acentos/ñ en el nombre original no
+  // rompan el header — el navegador lo decodifica igual al descargar.
+  const nombreBase = req.file.originalname.replace(/\.docx$/i, '') + ' - firmado.pdf';
+  res.set('Content-Type', 'application/pdf');
+  res.set('X-Nombre-Encontrado', String(nombreEncontrado));
+  res.set('Content-Disposition', `attachment; filename="documento-firmado.pdf"; filename*=UTF-8''${encodeURIComponent(nombreBase)}`);
+  res.send(pdfBuffer);
 });
 
 app.get('/api/finanzas', async (req, res) => {

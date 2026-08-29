@@ -216,6 +216,7 @@ const MODULE_DEFS = [
   { key: null, href: '/directo.html', icon: 'bolt', color: 'mod-orange', title: 'Directas', desc: 'Envía cotizaciones directas a proveedores seleccionados.' },
   { key: 'catalogo', href: '/catalog.html', icon: 'book', color: 'mod-teal', title: 'Catálogo', desc: 'Explora productos y servicios disponibles en el catálogo.' },
   { key: null, href: '/finanzas.html', icon: 'finance', color: 'mod-gold', title: 'Finanzas', desc: 'Consulta reportes financieros y análisis de cotizaciones.' },
+  { key: null, href: '/documentos.html', icon: 'sign', color: 'mod-rose', title: 'Autenticar documentos', desc: 'Sube un Word y estampa la firma del representante legal automáticamente.' },
 ];
 
 function moduleStatusLabel(key, counts) {

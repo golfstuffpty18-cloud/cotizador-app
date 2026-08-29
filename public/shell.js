@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: '/directo.html', icon: 'bolt', label: 'Directas' },
   { href: '/catalog.html', icon: 'book', label: 'Catálogo' },
   { href: '/finanzas.html', icon: 'finance', label: 'Finanzas' },
+  { href: '/documentos.html', icon: 'sign', label: 'Autenticar documentos' },
 ];
 
 function currentPath() {

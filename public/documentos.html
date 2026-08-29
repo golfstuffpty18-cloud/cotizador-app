@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autenticar documentos | GS Technologies and Security Solutions</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .file-drop{
+    display:block; text-align:center; padding:32px 12px; border-radius:12px;
+    border:2px dashed var(--border); color:var(--text-soft); font-size:.85rem; cursor:pointer; margin-bottom:14px;
+  }
+  .file-drop input{ display:none; }
+  .file-drop.dragover{ border-color:var(--blue); background:var(--surface-2); }
+  .resultado-card{ display:none; }
+  .resultado-card.show{ display:block; }
+  .aviso-revisar{ background:var(--amber-bg); color:var(--amber); font-size:.82rem; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
+  .aviso-ok{ background:var(--green-bg); color:var(--green); font-size:.82rem; padding:10px 12px; border-radius:8px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<script>window.PAGE_META = { title: 'Autenticar documentos', subtitle: 'Sube un Word (.docx) y estampa automáticamente la firma del representante legal.' };</script>
+<div id="app-shell"></div>
+
+<main class="content">
+  <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema busca dónde aparece el nombre del representante legal y estampa ahí la firma digital, la misma que ya usan los PDF de cotización. Descargas un PDF final, listo para enviar.</p>
+
+  <label class="file-drop" id="fileDrop">
+    <span data-icon="upload" data-icon-size="22" style="display:block;margin-bottom:8px"></span>
+    <span id="fileDropLabel">Toca para elegir un archivo .docx, o arrástralo aquí</span>
+    <input type="file" id="fileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+  </label>
+
+  <div id="status" class="status-msg"></div>
+
+  <div class="resultado-card empty-card" id="resultadoCard">
+    <div class="empty-illustration" data-icon="sign" data-icon-size="36"></div>
+    <h2 id="resultadoTitulo">Documento firmado</h2>
+    <div id="resultadoAviso"></div>
+    <button type="button" class="action-secondary" id="descargarDeNuevoBtn" data-icon="upload">Descargar de nuevo</button>
+  </div>
+</main>
+
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
+<script src="/documentos.js"></script>
+</body>
+</html>
