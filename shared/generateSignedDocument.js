@@ -3,6 +3,7 @@ const path = require('path');
 const mammoth = require('mammoth');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
+const { fillFormFields } = require('./fillFormFields');
 
 // Mismo archivo que ya usa shared/generateQuotePdf.js para las cotizaciones
 // — no se duplica el activo, solo se reutiliza.
@@ -44,6 +45,16 @@ async function signDocument(docxBuffer) {
   const { value: html } = await mammoth.convertToHtml({ buffer: docxBuffer });
   const $ = cheerio.load(html);
   const body = $('body');
+
+  // Antes de firmar, intenta llenar campos en blanco (nombre de la empresa,
+  // RUC, representante, etc.) con los datos conocidos de companyProfile.js.
+  // Si el documento ya está lleno, o el campo pide un dato que no tenemos,
+  // no se toca nada — ver shared/fillFormFields.js.
+  const parrafos = body.children().toArray().map((el) => $(el).text());
+  const llenados = await fillFormFields(parrafos);
+  llenados.forEach(({ indice, textoLleno }) => {
+    $(body.children().get(indice)).text(textoLleno);
+  });
 
   const firma = firmaHtml();
   let nombreEncontrado = false;
