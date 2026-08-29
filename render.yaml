@@ -9,13 +9,21 @@ services:
     name: cotizador-web
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: ./render-build.sh
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: cotizador-db
           property: connectionString
+      # La caché de Render no siempre sobrevive del build al contenedor de
+      # ejecución — sin esto, Puppeteer (usado por
+      # shared/generateSignedDocument.js para "Autenticar documentos") no
+      # encuentra el Chromium que instaló render-build.sh y falla con
+      # "Could not find Chrome". Debe apuntar al mismo lugar en el build y
+      # en tiempo de ejecución.
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
       - key: APP_ACCESS_CODE
         sync: false
       - key: VAPID_PUBLIC_KEY
