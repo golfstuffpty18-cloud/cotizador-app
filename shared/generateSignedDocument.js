@@ -88,16 +88,24 @@ async function signDocument(docxBuffer, respuestas = null) {
   }
 
   const firma = firmaHtml();
-  let nombreEncontrado = false;
 
+  // La ÚLTIMA aparición del nombre, no la primera: ahora que se llenan
+  // campos en blanco, el nombre del representante puede aparecer también en
+  // una frase temprana del documento (ej. "Yo, Ing. Dionisio Sánchez,
+  // portador de la cédula..."), antes del bloque de firma real que casi
+  // siempre está al final. Si solo aparece una vez (el caso más común),
+  // última y primera son la misma.
+  let elementoFirma = null;
   for (const el of body.children().toArray()) {
     if (contieneNombreRepresentante($(el).text())) {
-      $(el).after(firma);
-      nombreEncontrado = true;
-      break; // solo la primera aparición — si el nombre se repite, no se estampan varias firmas
+      elementoFirma = el;
     }
   }
-  if (!nombreEncontrado) {
+
+  const nombreEncontrado = elementoFirma !== null;
+  if (elementoFirma) {
+    $(elementoFirma).after(firma);
+  } else {
     body.append(firma);
   }
 
