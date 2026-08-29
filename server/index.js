@@ -583,11 +583,16 @@ app.post('/api/documentos/autenticar', upload.single('file'), async (req, res) =
     return res.status(200).json({ requierePendientes: true, pendientes: resultado.pendientes });
   }
 
-  const { pdfBuffer, colocacion } = resultado;
+  const { pdfBuffer, colocacion, numeroActo } = resultado;
 
   // filename*=UTF-8'' (RFC 5987) para que acentos/ñ en el nombre original no
-  // rompan el header — el navegador lo decodifica igual al descargar.
-  const nombreBase = req.file.originalname.replace(/\.docx$/i, '') + ' - firmado.pdf';
+  // rompan el header — el navegador lo decodifica igual al descargar. Mismo
+  // criterio que la app local con Word: sin "preforma", con el número de
+  // acto entre paréntesis cuando se conoce.
+  const nombreSinExtension = req.file.originalname.replace(/\.docx$/i, '').replace(/\s*preforma\s*/i, ' ').trim();
+  const nombreBase = numeroActo
+    ? `${nombreSinExtension} (${numeroActo}).pdf`
+    : `${nombreSinExtension} - firmado.pdf`;
   res.set('Content-Type', 'application/pdf');
   res.set('X-Firma-Colocacion', colocacion);
   res.set('Content-Disposition', `attachment; filename="documento-firmado.pdf"; filename*=UTF-8''${encodeURIComponent(nombreBase)}`);

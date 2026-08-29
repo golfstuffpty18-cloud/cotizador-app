@@ -100,11 +100,16 @@ async function signDocument(docxBuffer, respuestas = null) {
     $(body.children().get(p.indice)).text(aplicarPlantilla(p.plantilla, fechaHoy));
   });
 
+  // Si alguna respuesta corresponde al número de acto, se guarda aparte —
+  // server/index.js lo usa para nombrar el PDF final, igual que hace la app
+  // local con Word.
+  let numeroActo = null;
   if (respuestas) {
     pendientesDato.forEach((p) => {
       const valor = respuestas[String(p.indice)];
       if (valor && parrafos[p.indice] === p.textoOriginal) {
         $(body.children().get(p.indice)).text(aplicarPlantilla(p.plantilla, valor));
+        if (/acto/.test(normalizar(p.etiqueta))) numeroActo = valor;
       }
     });
   }
@@ -169,7 +174,7 @@ async function signDocument(docxBuffer, respuestas = null) {
       margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
     });
     const pdfBuffer = Buffer.from(pdfBytes);
-    return { pdfBuffer, colocacion };
+    return { pdfBuffer, colocacion, numeroActo };
   } finally {
     await browser.close();
   }
