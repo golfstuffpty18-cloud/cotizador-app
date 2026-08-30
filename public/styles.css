@@ -268,7 +268,7 @@ h1, h2, h3, p { margin: 0; }
     --text: #f5f6fb;
     --text-soft: #a9abc4;
     --text-faint: #6d6f8a;
-    --topbar-logo-size: 1cm;
+    --topbar-logo-size: 2cm;
   }
 
   .topbar { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
