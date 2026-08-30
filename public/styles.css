@@ -71,10 +71,11 @@ h1, h2, h3, p { margin: 0; }
   display: flex; align-items: center; gap: 24px;
   background: var(--navy); color: #fff;
   padding: 12px 22px;
+  position: sticky; top: 0; z-index: 20;
 }
 .topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.topbar-brand img { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; }
-.topbar-brand-name { font-size: 0.92rem; font-weight: 800; white-space: nowrap; }
+.topbar-brand img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+.topbar-brand-name { font-size: 1rem; font-weight: 800; white-space: nowrap; }
 
 .topbar-search {
   flex: 1; max-width: 480px; position: relative;
@@ -114,7 +115,7 @@ h1, h2, h3, p { margin: 0; }
 .sidebar {
   width: 220px; flex-shrink: 0;
   background: var(--navy); padding: 18px 14px;
-  position: sticky; top: 0; height: 100vh;
+  position: sticky; top: 68px; height: calc(100vh - 68px);
 }
 .sidebar-nav { display: flex; flex-direction: column; gap: 3px; }
 .sidebar-link {
@@ -154,8 +155,9 @@ h1, h2, h3, p { margin: 0; }
 .module-icon.mod-rose { background: var(--mod-rose); }
 
 .module-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
-.module-desc { font-size: 0.8rem; color: var(--text-soft); line-height: 1.4; }
-.module-status { display: none; } /* solo se muestra en celular, ver media query */
+.module-desc { font-size: 0.8rem; color: var(--text-soft); line-height: 1.4; margin-bottom: 8px; }
+.module-status { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-faint); }
+.module-status.has-items { color: var(--green); }
 
 /* ---------- estado vacío / activar notificaciones ---------- */
 
