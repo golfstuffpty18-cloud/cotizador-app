@@ -38,6 +38,8 @@
   --mod-gold: #a97400;
   --mod-rose: #e11d48;
 
+  --topbar-logo-size: 2cm;
+
   --radius: 14px;
   --radius-sm: 10px;
   --shadow: 0 10px 24px -16px rgba(10, 10, 26, 0.25);
@@ -74,7 +76,7 @@ h1, h2, h3, p { margin: 0; }
   position: sticky; top: 0; z-index: 20;
 }
 .topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.topbar-brand img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+.topbar-brand img { width: var(--topbar-logo-size); height: var(--topbar-logo-size); border-radius: 14px; object-fit: cover; }
 .topbar-brand-name { font-size: 1rem; font-weight: 800; white-space: nowrap; }
 
 .topbar-search {
@@ -115,7 +117,8 @@ h1, h2, h3, p { margin: 0; }
 .sidebar {
   width: 220px; flex-shrink: 0;
   background: var(--navy); padding: 18px 14px;
-  position: sticky; top: 68px; height: calc(100vh - 68px);
+  position: sticky; top: calc(var(--topbar-logo-size) + 24px);
+  height: calc(100vh - var(--topbar-logo-size) - 24px);
 }
 .sidebar-nav { display: flex; flex-direction: column; gap: 3px; }
 .sidebar-link {
@@ -265,10 +268,12 @@ h1, h2, h3, p { margin: 0; }
     --text: #f5f6fb;
     --text-soft: #a9abc4;
     --text-faint: #6d6f8a;
+    --topbar-logo-size: 1cm;
   }
 
   .topbar { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
   .topbar-brand-name { display: none; }
+  .topbar-brand img { border-radius: 8px; }
   .topbar-search { order: 3; flex-basis: 100%; max-width: none; }
   .topbar-user-role { display: none; }
 
