@@ -211,7 +211,8 @@ async function loadOpportunities() {
 const MODULE_DEFS = [
   { key: 'cotizacion_linea', href: '/index.html', icon: 'quote', color: 'mod-blue', title: 'Cotización en línea', desc: 'Solicita cotizaciones para productos o servicios específicos de múltiples proveedores.' },
   { key: 'compra_menor', href: '/compra-menor.html', icon: 'cart', color: 'mod-emerald', title: 'Compra Menor', desc: 'Realiza compras de bajo monto de forma rápida y sencilla.' },
-  { key: 'programadas', href: '/programadas.html', icon: 'calendar', color: 'mod-violet', title: 'Programadas', desc: 'Gestiona cotizaciones programadas y recordatorios automáticos.' },
+  { key: null, href: '/calendario.html', icon: 'calendar', color: 'mod-indigo', title: 'Calendario', desc: 'Fechas límite y aperturas de PanamaCompra, más tus propias citas.' },
+  { key: 'programadas', href: '/programadas.html', icon: 'bell', color: 'mod-violet', title: 'Programadas', desc: 'Gestiona cotizaciones programadas y recordatorios automáticos.' },
   { key: 'enviadas', href: '/enviadas.html', icon: 'send', color: 'mod-sky', title: 'Enviadas', desc: 'Consulta el historial de cotizaciones enviadas y su estado actual.' },
   { key: null, href: '/directo.html', icon: 'bolt', color: 'mod-orange', title: 'Directas', desc: 'Envía cotizaciones directas a proveedores seleccionados.' },
   { key: 'catalogo', href: '/catalog.html', icon: 'book', color: 'mod-teal', title: 'Catálogo', desc: 'Explora productos y servicios disponibles en el catálogo.' },

@@ -196,6 +196,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMPTZ NOT NULL
 );
 
+-- Calendario: citas que el usuario agrega a mano (no vienen de PanamaCompra).
+-- Los eventos "automáticos" del calendario (fecha límite de una oportunidad,
+-- apertura de una programada) NO se guardan acá — se leen en vivo de
+-- opportunities.deadline/window_start en el endpoint /api/calendar, así que
+-- siempre reflejan el estado real sin duplicar datos.
+CREATE TABLE IF NOT EXISTS calendar_events (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id),
+  title TEXT NOT NULL,
+  notes TEXT,
+  event_date DATE NOT NULL,
+  event_time TIME,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(event_date);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;

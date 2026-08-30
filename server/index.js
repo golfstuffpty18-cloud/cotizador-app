@@ -429,6 +429,66 @@ app.all('/api/cron/search-panamacompra', async (req, res) => {
   }
 });
 
+// Calendario: junta en una sola lista lo automático (fecha límite y apertura
+// de oportunidades ya guardadas en PanamaCompra) con las citas manuales del
+// usuario — así una sola pantalla cubre ambas cosas sin que el usuario tenga
+// que ir a buscar las fechas a otro lado.
+app.get('/api/calendar', async (req, res) => {
+  const companyId = resolveCompanyId(req);
+  const month = /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : new Date().toISOString().slice(0, 7);
+
+  const [manual, deadlines, aperturas] = await Promise.all([
+    pool.query(
+      `SELECT id, title, notes, event_date, event_time FROM calendar_events
+       WHERE company_id = $1 AND to_char(event_date, 'YYYY-MM') = $2
+       ORDER BY event_date, event_time NULLS LAST`,
+      [companyId, month]
+    ),
+    pool.query(
+      `SELECT id, act_number, title, entity, deadline FROM opportunities
+       WHERE deadline IS NOT NULL AND decision != 'no_participar'
+         AND company_id = $1 AND to_char(deadline, 'YYYY-MM') = $2`,
+      [companyId, month]
+    ),
+    pool.query(
+      `SELECT id, act_number, title, entity, window_start FROM opportunities
+       WHERE window_start IS NOT NULL AND decision != 'no_participar' AND ${ES_PROGRAMADA_SQL}
+         AND company_id = $1 AND to_char(window_start, 'YYYY-MM') = $2`,
+      [companyId, month]
+    ),
+  ]);
+
+  const events = [
+    ...manual.rows.map(r => ({
+      kind: 'manual', id: r.id, title: r.title, notes: r.notes,
+      date: `${r.event_date.toISOString().slice(0, 10)}${r.event_time ? 'T' + r.event_time : ''}`,
+    })),
+    ...deadlines.rows.map(r => ({
+      kind: 'vence', id: r.id, title: r.title, entity: r.entity, actNumber: r.act_number, date: r.deadline,
+    })),
+    ...aperturas.rows.map(r => ({
+      kind: 'apertura', id: r.id, title: r.title, entity: r.entity, actNumber: r.act_number, date: r.window_start,
+    })),
+  ];
+  res.json(events);
+});
+
+app.post('/api/calendar-events', async (req, res) => {
+  const { title, notes, event_date, event_time } = req.body || {};
+  if (!title || !event_date) return res.status(400).json({ error: 'faltan título o fecha' });
+  const { rows } = await pool.query(
+    `INSERT INTO calendar_events (company_id, title, notes, event_date, event_time)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [resolveCompanyId(req), title, notes || null, event_date, event_time || null]
+  );
+  res.json(rows[0]);
+});
+
+app.delete('/api/calendar-events/:id', async (req, res) => {
+  await pool.query('DELETE FROM calendar_events WHERE id = $1 AND company_id = $2', [req.params.id, resolveCompanyId(req)]);
+  res.json({ ok: true });
+});
+
 app.get('/api/enviadas', async (req, res) => {
   res.json(await listarEnviadas());
 });

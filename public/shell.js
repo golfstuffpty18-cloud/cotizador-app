@@ -14,7 +14,8 @@ const USER = { name: 'GS Technologies', role: 'Administrador' };
 const NAV_ITEMS = [
   { href: '/index.html', icon: 'quote', label: 'Cotización en línea' },
   { href: '/compra-menor.html', icon: 'cart', label: 'Compra Menor' },
-  { href: '/programadas.html', icon: 'calendar', label: 'Programadas' },
+  { href: '/calendario.html', icon: 'calendar', label: 'Calendario' },
+  { href: '/programadas.html', icon: 'bell', label: 'Programadas' },
   { href: '/enviadas.html', icon: 'send', label: 'Enviadas' },
   { href: '/directo.html', icon: 'bolt', label: 'Directas' },
   { href: '/catalog.html', icon: 'book', label: 'Catálogo' },

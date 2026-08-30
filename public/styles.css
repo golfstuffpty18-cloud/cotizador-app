@@ -37,6 +37,7 @@
   --mod-teal: #0d9488;
   --mod-gold: #a97400;
   --mod-rose: #e11d48;
+  --mod-indigo: #4f46e5;
 
   --topbar-logo-size: 2cm;
 
@@ -156,6 +157,7 @@ h1, h2, h3, p { margin: 0; }
 .module-icon.mod-teal { background: var(--mod-teal); }
 .module-icon.mod-gold { background: var(--mod-gold); }
 .module-icon.mod-rose { background: var(--mod-rose); }
+.module-icon.mod-indigo { background: var(--mod-indigo); }
 
 .module-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
 .module-desc { font-size: 0.8rem; color: var(--text-soft); line-height: 1.4; margin-bottom: 8px; }

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendario | GS Technologies and Security Solutions</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .cal-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .cal-nav-btn {
+    width: 34px; height: 34px; border-radius: 999px; border: 2px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 700; cursor: pointer;
+  }
+  .cal-month-label { font-size: 1.05rem; font-weight: 800; min-width: 170px; text-align: center; }
+  .cal-spacer { flex: 1; }
+
+  .cal-legend { display: flex; gap: 14px; font-size: 0.74rem; color: var(--text-soft); margin-bottom: 12px; flex-wrap: wrap; }
+  .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .cal-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+  .cal-dot.vence { background: var(--red); }
+  .cal-dot.apertura { background: var(--mod-violet); }
+  .cal-dot.manual { background: var(--blue); }
+
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 20px; }
+  .cal-weekday { text-align: center; font-size: 0.7rem; font-weight: 700; color: var(--text-faint); text-transform: uppercase; padding-bottom: 4px; }
+  .cal-day {
+    background: var(--surface); border: 2px solid var(--border); border-radius: 10px;
+    min-height: 78px; padding: 6px; cursor: pointer; text-align: left;
+  }
+  .cal-day.other-month { opacity: 0.4; }
+  .cal-day.today { border-color: var(--blue); }
+  .cal-day.selected { border-color: var(--blue); background: var(--surface-2); }
+  .cal-day-num { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+  .cal-day-dots { display: flex; gap: 3px; margin-top: 6px; flex-wrap: wrap; }
+
+  .cal-panel { background: var(--surface); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .cal-panel h2 { font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
+  .cal-event { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .cal-event:last-child { border-bottom: none; }
+  .cal-event .cal-dot { margin-top: 5px; flex-shrink: 0; }
+  .cal-event-title { font-size: 0.86rem; font-weight: 700; color: var(--text); }
+  .cal-event-meta { font-size: 0.76rem; color: var(--text-soft); margin-top: 2px; }
+  .cal-event-del { margin-left: auto; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+
+  .cal-form { display: none; }
+  .cal-form.show { display: block; }
+  .cal-form label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .cal-form input, .cal-form textarea {
+    width: 100%; padding: 9px 11px; border-radius: 8px; border: 2px solid var(--border);
+    font-size: 0.85rem; font-family: inherit; margin-bottom: 10px; background: var(--surface); color: var(--text);
+  }
+  .cal-form input:focus, .cal-form textarea:focus { outline: none; border-color: var(--blue); }
+  .cal-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style>
+</head>
+<body>
+<script>window.PAGE_META = { title: 'Calendario', subtitle: 'Fechas límite y aperturas de PanamaCompra, más tus propias citas' };</script>
+<div id="app-shell"></div>
+
+<main class="content">
+  <div class="cal-toolbar">
+    <button class="cal-nav-btn" id="prevBtn">‹</button>
+    <div class="cal-month-label" id="monthLabel"></div>
+    <button class="cal-nav-btn" id="nextBtn">›</button>
+    <button class="action-secondary" id="todayBtn" data-icon="calendar">Hoy</button>
+    <div class="cal-spacer"></div>
+    <button class="action-primary" id="addBtn" data-icon="calendar">Agregar cita</button>
+  </div>
+
+  <div class="cal-legend">
+    <span><span class="cal-dot vence"></span> Fecha límite</span>
+    <span><span class="cal-dot apertura"></span> Se abre (programada)</span>
+    <span><span class="cal-dot manual"></span> Cita agregada</span>
+  </div>
+
+  <div class="cal-grid" id="calGrid"></div>
+
+  <div class="cal-panel">
+    <h2 id="dayHeading">Hoy</h2>
+    <div id="dayEvents"></div>
+  </div>
+
+  <div class="cal-panel cal-form" id="addForm">
+    <h2>Nueva cita</h2>
+    <label>Título</label>
+    <input type="text" id="fTitle" placeholder="Ej: Llamar al proveedor">
+    <div class="cal-form-row">
+      <div><label>Fecha</label><input type="date" id="fDate"></div>
+      <div><label>Hora (opcional)</label><input type="time" id="fTime"></div>
+    </div>
+    <label>Notas (opcional)</label>
+    <textarea id="fNotes" rows="2"></textarea>
+    <div class="fin-btn-row" style="display:flex;gap:10px;">
+      <button type="button" class="action-secondary" id="cancelFormBtn">Cancelar</button>
+      <button type="button" class="action-primary" id="saveFormBtn">Guardar cita</button>
+    </div>
+  </div>
+</main>
+
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
+<script src="/calendario.js"></script>
+</body>
+</html>
