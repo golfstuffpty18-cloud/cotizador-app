@@ -114,6 +114,7 @@ h1, h2, h3, p { margin: 0; }
 .sidebar {
   width: 220px; flex-shrink: 0;
   background: var(--navy); padding: 18px 14px;
+  position: sticky; top: 0; height: 100vh;
 }
 .sidebar-nav { display: flex; flex-direction: column; gap: 3px; }
 .sidebar-link {
