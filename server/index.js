@@ -439,7 +439,7 @@ app.get('/api/calendar', async (req, res) => {
 
   const [manual, deadlines, aperturas] = await Promise.all([
     pool.query(
-      `SELECT id, title, notes, event_date, event_time FROM calendar_events
+      `SELECT id, title, notes, event_date, event_time, done FROM calendar_events
        WHERE company_id = $1 AND to_char(event_date, 'YYYY-MM') = $2
        ORDER BY event_date, event_time NULLS LAST`,
       [companyId, month]
@@ -460,7 +460,7 @@ app.get('/api/calendar', async (req, res) => {
 
   const events = [
     ...manual.rows.map(r => ({
-      kind: 'manual', id: r.id, title: r.title, notes: r.notes,
+      kind: 'manual', id: r.id, title: r.title, notes: r.notes, done: r.done,
       date: `${r.event_date.toISOString().slice(0, 10)}${r.event_time ? 'T' + r.event_time : ''}`,
     })),
     ...deadlines.rows.map(r => ({
@@ -481,6 +481,28 @@ app.post('/api/calendar-events', async (req, res) => {
      VALUES ($1,$2,$3,$4,$5) RETURNING *`,
     [resolveCompanyId(req), title, notes || null, event_date, event_time || null]
   );
+  res.json(rows[0]);
+});
+
+app.put('/api/calendar-events/:id', async (req, res) => {
+  const { title, notes, event_date, event_time } = req.body || {};
+  if (!title || !event_date) return res.status(400).json({ error: 'faltan título o fecha' });
+  const { rows } = await pool.query(
+    `UPDATE calendar_events SET title = $1, notes = $2, event_date = $3, event_time = $4
+     WHERE id = $5 AND company_id = $6 RETURNING *`,
+    [title, notes || null, event_date, event_time || null, req.params.id, resolveCompanyId(req)]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  res.json(rows[0]);
+});
+
+app.put('/api/calendar-events/:id/done', async (req, res) => {
+  const { done } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE calendar_events SET done = $1 WHERE id = $2 AND company_id = $3 RETURNING *`,
+    [!!done, req.params.id, resolveCompanyId(req)]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
   res.json(rows[0]);
 });
 

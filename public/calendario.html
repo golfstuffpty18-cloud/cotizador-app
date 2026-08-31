@@ -41,9 +41,12 @@
   .cal-event { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .cal-event:last-child { border-bottom: none; }
   .cal-event .cal-dot { margin-top: 5px; flex-shrink: 0; }
+  .cal-event-check { margin-top: 3px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue); }
   .cal-event-title { font-size: 0.86rem; font-weight: 700; color: var(--text); }
   .cal-event-meta { font-size: 0.76rem; color: var(--text-soft); margin-top: 2px; }
-  .cal-event-del { margin-left: auto; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+  .cal-event.done .cal-event-title { text-decoration: line-through; color: var(--text-faint); }
+  .cal-event-edit, .cal-event-del { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+  .cal-event-edit { margin-left: auto; }
 
   .cal-form { display: none; }
   .cal-form.show { display: block; }
@@ -84,7 +87,7 @@
   </div>
 
   <div class="cal-panel cal-form" id="addForm">
-    <h2>Nueva cita</h2>
+    <h2 id="formHeading">Nueva cita</h2>
     <label>Título</label>
     <input type="text" id="fTitle" placeholder="Ej: Llamar al proveedor">
     <div class="cal-form-row">

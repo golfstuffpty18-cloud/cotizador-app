@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(event_date);
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;

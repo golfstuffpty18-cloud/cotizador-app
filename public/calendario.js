@@ -86,6 +86,35 @@ async function deleteEvent(id) {
   loadMonth();
 }
 
+async function toggleDone(id, done) {
+  await fetch(`/api/calendar-events/${id}/done`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done }),
+  });
+  loadMonth();
+}
+
+function findEvent(id) {
+  for (const day of Object.values(eventsByDay)) {
+    const found = day.find(e => e.kind === 'manual' && String(e.id) === String(id));
+    if (found) return found;
+  }
+  return null;
+}
+
+function editEvent(id) {
+  const ev = findEvent(id);
+  if (!ev) return;
+  openForm({
+    id: ev.id,
+    title: ev.title,
+    notes: ev.notes || '',
+    date: ev.date.slice(0, 10),
+    time: ev.date.length > 10 ? ev.date.slice(11, 16) : '',
+  });
+}
+
 function renderDay(dateStr) {
   const heading = document.getElementById('dayHeading');
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -104,19 +133,31 @@ function renderDay(dateStr) {
     if (time) metaParts.push(time);
     if (e.entity) metaParts.push(e.entity);
     if (e.actNumber) metaParts.push(e.actNumber);
+    const isManual = e.kind === 'manual';
     return `
-      <div class="cal-event">
-        <span class="cal-dot ${e.kind}"></span>
+      <div class="cal-event ${isManual && e.done ? 'done' : ''}">
+        ${isManual
+          ? `<input type="checkbox" class="cal-event-check" data-id="${e.id}" ${e.done ? 'checked' : ''} title="Cumplido">`
+          : `<span class="cal-dot ${e.kind}"></span>`}
         <div>
           <div class="cal-event-title">${e.title}${e.notes ? ` — ${e.notes}` : ''}</div>
           <div class="cal-event-meta">${metaParts.join(' · ')}</div>
         </div>
-        ${e.kind === 'manual' ? `<button class="cal-event-del" data-id="${e.id}" title="Borrar">✕</button>` : ''}
+        ${isManual ? `
+          <button class="cal-event-edit" data-id="${e.id}" title="Editar">✎</button>
+          <button class="cal-event-del" data-id="${e.id}" title="Borrar">✕</button>
+        ` : ''}
       </div>
     `;
   }).join('');
   container.querySelectorAll('.cal-event-del').forEach(btn => {
     btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
+  });
+  container.querySelectorAll('.cal-event-edit').forEach(btn => {
+    btn.addEventListener('click', () => editEvent(btn.dataset.id));
+  });
+  container.querySelectorAll('.cal-event-check').forEach(chk => {
+    chk.addEventListener('change', () => toggleDone(chk.dataset.id, chk.checked));
   });
 }
 
@@ -134,27 +175,38 @@ document.getElementById('todayBtn').addEventListener('click', () => {
 });
 
 const addForm = document.getElementById('addForm');
-document.getElementById('addBtn').addEventListener('click', () => {
-  document.getElementById('fDate').value = selectedDate;
-  document.getElementById('fTitle').value = '';
-  document.getElementById('fTime').value = '';
-  document.getElementById('fNotes').value = '';
+const formHeading = document.getElementById('formHeading');
+const saveFormBtn = document.getElementById('saveFormBtn');
+let editingId = null;
+
+function openForm(prefill) {
+  editingId = prefill ? prefill.id : null;
+  formHeading.textContent = editingId ? 'Editar cita' : 'Nueva cita';
+  saveFormBtn.textContent = editingId ? 'Guardar cambios' : 'Guardar cita';
+  document.getElementById('fTitle').value = prefill ? prefill.title : '';
+  document.getElementById('fDate').value = prefill ? prefill.date : selectedDate;
+  document.getElementById('fTime').value = prefill ? prefill.time : '';
+  document.getElementById('fNotes').value = prefill ? prefill.notes : '';
   addForm.classList.add('show');
   document.getElementById('fTitle').focus();
-});
+}
+
+document.getElementById('addBtn').addEventListener('click', () => openForm(null));
 document.getElementById('cancelFormBtn').addEventListener('click', () => addForm.classList.remove('show'));
-document.getElementById('saveFormBtn').addEventListener('click', async () => {
+saveFormBtn.addEventListener('click', async () => {
   const title = document.getElementById('fTitle').value.trim();
   const event_date = document.getElementById('fDate').value;
   const event_time = document.getElementById('fTime').value;
   const notes = document.getElementById('fNotes').value.trim();
   if (!title || !event_date) return;
-  await fetch('/api/calendar-events', {
-    method: 'POST',
+  const url = editingId ? `/api/calendar-events/${editingId}` : '/api/calendar-events';
+  await fetch(url, {
+    method: editingId ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, notes, event_date, event_time }),
   });
   addForm.classList.remove('show');
+  editingId = null;
   selectedDate = event_date;
   const [y, m] = event_date.split('-').map(Number);
   viewYear = y; viewMonth = m - 1;
