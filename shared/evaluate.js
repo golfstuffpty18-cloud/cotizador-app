@@ -17,6 +17,15 @@ const CATEGORY_KEYWORDS = {
     'camara ip', 'cámara ip', 'camaras ip', 'cámaras ip', 'camara ptz', 'cámara ptz', 'camara ir', 'cámara ir',
     'sistema de camaras', 'sistema de cámaras', 'circuito cerrado de television', 'circuito cerrado de televisión',
     'cctv', 'videovigilancia', 'video vigilancia',
+    // Plural sin calificador ("compra e instalación de Cámaras en 14 puntos
+    // de la escuela") — acto real de PanamaCompra (2026-0-07-09-09-CL-065208,
+    // 2026-08-31) que este filtro dejó pasar por no decir "de seguridad"/
+    // "de vigilancia". A propósito solo el PLURAL, no "camara"/"cámara" en
+    // singular — ese quedó fuera arriba justamente por dar falsos positivos
+    // con equipo médico (cámara endoscópica), que se compra de a una, no en
+    // plural, y sigue cubierto por EXCLUDE_KEYWORDS (hospital/quirurgic) si
+    // el título lo menciona.
+    'camaras', 'cámaras',
   ],
   'Alarma de Intrusión': [
     'alarma', 'intrusion', 'intrusión', 'sensor de movimiento', 'alarma contra robo',
