@@ -11,8 +11,16 @@ const FIRMA_PATH = path.join(__dirname, 'assets', 'firma.png');
 
 // Mismo nombre que ya está impreso en la firma de las cotizaciones
 // (generateQuotePdf.js) — se busca dentro del Word, insensible a mayúsculas
-// y acentos, para saber dónde estampar la firma.
-const NOMBRE_REPRESENTANTE = 'dionisio sanchez';
+// y acentos, para saber dónde estampar la firma. Los contratos legales reales
+// (ej. adendas del Órgano Judicial) usan el nombre completo con segundo
+// nombre y apellido materno ("Dionisio ALBERTO Sánchez VILLALÁZ"), no la
+// forma corta de companyProfile.js ("Dionisio Sánchez") — por eso se busca
+// nombre y apellido por separado, permitiendo cualquier cosa en el medio
+// (segundo nombre, apellido materno), en vez de exigir la frase exacta
+// pegada. Caso real que reveló esto: 2026-09-03, Adenda N.1 Contrato
+// 146/2025 con el Órgano Judicial, donde la firma no se ubicó en la línea de
+// "LA CONTRATISTA" porque "dionisio sanchez" no aparecía pegado en el texto.
+const NOMBRE_REPRESENTANTE_RE = /\bdionisio\b[\s\S]{0,40}?\bsanchez\b/;
 
 function normalizar(str) {
   return (str || '')
@@ -21,7 +29,7 @@ function normalizar(str) {
 }
 
 function contieneNombreRepresentante(texto) {
-  return normalizar(texto).includes(NOMBRE_REPRESENTANTE);
+  return NOMBRE_REPRESENTANTE_RE.test(normalizar(texto));
 }
 
 // La línea de firma en blanco de un documento legal ("____________", sin
