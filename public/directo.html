@@ -64,9 +64,14 @@
     <select id="categoria"></select>
 
     <label>Ítems</label>
-    <p class="sugg-hint">Al escribir, te sugerimos ítems ya cargados en el catálogo de esta categoría (así el Excel sale con el precio ya sugerido).</p>
+    <p class="sugg-hint">Al escribir, te sugerimos ítems ya cargados en el catálogo de esta categoría (así el Excel sale con el precio ya sugerido). O si ya tienes la lista en Excel, súbela directo abajo — puedes editarla y modificarla aquí antes de crear la cotización.</p>
     <div id="items"></div>
     <button type="button" class="df-btn df-btn-add" id="btnAddItem">+ Agregar ítem</button>
+
+    <label for="excelItemsInput" style="margin-top:4px">O sube un Excel con la lista de ítems</label>
+    <input type="file" id="excelItemsInput" accept=".xlsx" style="margin-bottom:8px">
+    <button type="button" class="df-btn df-btn-add" id="btnImportarExcel">📄 Cargar ítems desde ese Excel</button>
+    <div id="importMsg" style="font-size:.78rem;color:var(--text-soft);margin:-6px 0 12px;min-height:1.1em"></div>
 
     <button type="button" class="df-btn df-btn-primary" id="btnCrear">Crear cotización</button>
     <div id="msg"></div>

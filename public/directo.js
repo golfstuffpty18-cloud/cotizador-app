@@ -41,15 +41,17 @@ async function fetchSuggestions(q, suggList, descInput) {
   });
 }
 
-function addItemRow() {
+function addItemRow(valoresIniciales) {
   const row = document.createElement('div');
   row.className = 'item-row';
+  const descInicial = valoresIniciales ? escapeHtml(valoresIniciales.descripcion || '') : '';
+  const cantInicial = valoresIniciales ? (Number(valoresIniciales.cantidad) || 1) : 1;
   row.innerHTML = `
     <div class="desc-wrap">
-      <input type="text" class="item-desc" placeholder="Descripción del ítem" autocomplete="off">
+      <input type="text" class="item-desc" placeholder="Descripción del ítem" autocomplete="off" value="${descInicial}">
       <div class="sugg-list"></div>
     </div>
-    <input type="number" class="item-cant" placeholder="Cant." min="1" value="1">
+    <input type="number" class="item-cant" placeholder="Cant." min="1" value="${cantInicial}">
     <button type="button" class="rm">×</button>
   `;
   row.querySelector('.rm').addEventListener('click', () => {
@@ -75,7 +77,32 @@ function addItemRow() {
   itemsWrap.appendChild(row);
 }
 
-btnAddItem.addEventListener('click', addItemRow);
+btnAddItem.addEventListener('click', () => addItemRow());
+
+const excelItemsInput = document.getElementById('excelItemsInput');
+const btnImportarExcel = document.getElementById('btnImportarExcel');
+const importMsg = document.getElementById('importMsg');
+btnImportarExcel.addEventListener('click', async () => {
+  if (!excelItemsInput.files.length) { importMsg.textContent = 'Elige un archivo .xlsx primero.'; return; }
+  importMsg.textContent = 'Leyendo el Excel…';
+  btnImportarExcel.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('file', excelItemsInput.files[0]);
+    const res = await fetch('/api/opportunities/directo/importar-excel', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { importMsg.textContent = '❌ ' + (data.error || 'No se pudo leer el archivo.'); return; }
+    // Reemplaza los renglones actuales por los del Excel -- el usuario los
+    // sigue viendo y puede editarlos/borrarlos/agregar más antes de crear.
+    itemsWrap.innerHTML = '';
+    data.items.forEach((item) => addItemRow(item));
+    importMsg.textContent = `✅ Se cargaron ${data.items.length} ítem(s) — revísalos y ajusta lo que haga falta antes de crear.`;
+  } catch (err) {
+    importMsg.textContent = '❌ Error al leer el archivo: ' + err.message;
+  } finally {
+    btnImportarExcel.disabled = false;
+  }
+});
 
 btnNueva.addEventListener('click', (e) => {
   e.preventDefault();

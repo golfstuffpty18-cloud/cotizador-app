@@ -17,6 +17,7 @@ const { resolveCompanyId } = require('../shared/tenant');
 const { parseQuoteExcel } = require('../shared/parseQuoteExcel');
 const { suggestPricesForItems, upsertFromQuoteItems, importCatalogRows } = require('../shared/catalog');
 const { parseCatalogExcel } = require('../shared/parseCatalogExcel');
+const { parseDirectoItemsExcel } = require('../shared/parseDirectoItemsExcel');
 const { runCheckEmailJob } = require('../shared/checkEmailJob');
 const { sendPushToAll } = require('../shared/push');
 const { searchOpenByCategory, searchCompraMenor, runSearchJob } = require('../shared/searchPanamaCompra');
@@ -138,6 +139,21 @@ app.get('/api/opportunities', async (req, res) => {
     params
   );
   res.json(rows);
+});
+
+// Alternativa a escribir cada ítem a mano en el formulario de "Nueva
+// cotización directa": sube cualquier Excel simple (columnas Descripción/
+// Modelo/Cantidad, en cualquier orden) y devuelve los ítems ya leídos para
+// que el formulario los cargue solos -- el usuario los sigue viendo y
+// pudiendo editar antes de crear la cotización, no se crea nada todavía acá.
+app.post('/api/opportunities/directo/importar-excel', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'no se recibió ningún archivo' });
+  try {
+    const { items } = await parseDirectoItemsExcel(req.file.buffer);
+    res.json({ items });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // Cotización para un cliente fuera de PanamaCompra: no hay pliego del que
