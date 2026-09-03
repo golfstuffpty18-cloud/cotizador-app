@@ -20,7 +20,11 @@ const NAV_ITEMS = [
   { href: '/directo.html', icon: 'bolt', label: 'Directas' },
   { href: '/catalog.html', icon: 'book', label: 'Catálogo' },
   { href: '/finanzas.html', icon: 'finance', label: 'Finanzas' },
-  { href: '/documentos.html', icon: 'sign', label: 'Autenticar documentos' },
+  // Va directo al firmador local (Word real, formato perfecto) en vez de a
+  // la version web (mammoth+Puppeteer mueve logos/titulos en documentos con
+  // diseno elaborado) -- decision del usuario 2026-09-03, ver
+  // gstechnologies_single_platform_preference en memoria.
+  { href: 'http://localhost:4173', icon: 'sign', label: 'Autenticar documentos', external: true },
 ];
 
 function currentPath() {
@@ -66,7 +70,7 @@ function renderShell(meta) {
   const nav = document.createElement('nav');
   nav.className = 'sidebar-nav';
   nav.innerHTML = NAV_ITEMS.map(item => `
-    <a class="sidebar-link ${item.href === here ? 'active' : ''}" href="${item.href}">
+    <a class="sidebar-link ${item.href === here ? 'active' : ''}" href="${item.href}"${item.external ? ' target="_blank" rel="noopener"' : ''}>
       <span class="icon">${icon(item.icon, 17)}</span><span>${item.label}</span>
     </a>
   `).join('');

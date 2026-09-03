@@ -29,6 +29,13 @@
   .resultado-card h2{ font-size:1rem; margin:0 0 10px; color:var(--text); }
   .preview-frame-wrap{ border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:14px; }
   .preview-frame{ display:block; width:100%; height:70vh; border:0; background:#525659; }
+  .local-tool-card{
+    background:var(--surface); border:2px solid var(--blue); border-radius:12px;
+    padding:16px 18px; margin-bottom:18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .local-tool-card .texto{ flex:1; min-width:220px; }
+  .local-tool-card h2{ font-size:.92rem; margin:0 0 4px; color:var(--text); }
+  .local-tool-card p{ font-size:.8rem; color:var(--text-soft); margin:0; }
 </style>
 </head>
 <body>
@@ -36,6 +43,14 @@
 <div id="app-shell"></div>
 
 <main class="content">
+  <div class="local-tool-card">
+    <div class="texto">
+      <h2>¿Formato exacto, sin mover nada del Word original?</h2>
+      <p>Usa el firmador local — corre en esta PC con Word real, así que el diseño (logos, centrado, espaciado) nunca cambia. La versión de abajo es más rápida y funciona desde cualquier dispositivo, pero puede correr un poco el formato en documentos con diseño elaborado.</p>
+    </div>
+    <a class="action-primary" data-icon="sign" href="http://localhost:4173" target="_blank" rel="noopener">Abrir firmador local</a>
+  </div>
+
   <p class="intro-card">Sube cualquier documento en Word — una declaración jurada, una carta, un formulario de PanamaCompra. El sistema llena los campos en blanco con los datos de la empresa, sin mover el texto de su lugar original, y estampa la firma digital en la línea de firma del documento (o donde aparece el nombre del representante legal si no hay una línea dedicada). Si el formulario pide algún dato que no tenemos guardado, te lo preguntamos antes de firmar. Antes de descargar, puedes revisar el PDF final aquí mismo.</p>
 
   <label class="file-drop" id="fileDrop">

@@ -217,7 +217,9 @@ const MODULE_DEFS = [
   { key: null, href: '/directo.html', icon: 'bolt', color: 'mod-orange', title: 'Directas', desc: 'Envía cotizaciones directas a proveedores seleccionados.' },
   { key: 'catalogo', href: '/catalog.html', icon: 'book', color: 'mod-teal', title: 'Catálogo', desc: 'Explora productos y servicios disponibles en el catálogo.' },
   { key: null, href: '/finanzas.html', icon: 'finance', color: 'mod-gold', title: 'Finanzas', desc: 'Consulta reportes financieros y análisis de cotizaciones.' },
-  { key: null, href: '/documentos.html', icon: 'sign', color: 'mod-rose', title: 'Autenticar documentos', desc: 'Sube un Word y estampa la firma del representante legal automáticamente.' },
+  // Va directo al firmador local (Word real, formato perfecto), ver la
+  // misma nota en shell.js NAV_ITEMS.
+  { key: null, href: 'http://localhost:4173', icon: 'sign', color: 'mod-rose', title: 'Autenticar documentos', desc: 'Firmador local: Word real, formato perfecto, sin mover nada del original.', external: true },
 ];
 
 function moduleStatusLabel(key, counts) {
@@ -237,7 +239,7 @@ function renderModuleGrid(counts) {
     const status = moduleStatusLabel(m.key, counts);
     const hasItems = m.key && counts[m.key] > 0;
     return `
-      <a class="module-card" href="${m.href}">
+      <a class="module-card" href="${m.href}"${m.external ? ' target="_blank" rel="noopener"' : ''}>
         <div class="module-icon ${m.color}">${icon(m.icon, 20)}</div>
         <div class="module-title">${m.title}</div>
         <div class="module-desc">${m.desc}</div>
