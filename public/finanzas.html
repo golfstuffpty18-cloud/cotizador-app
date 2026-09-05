@@ -63,9 +63,11 @@
   .proyectos-toggle{ font-size:.78rem; color:var(--blue); font-weight:700; cursor:pointer; text-align:center; margin-top:4px; }
   #proyectosTabla{ display:none; margin-top:10px; }
   #proyectosTabla.show{ display:block; }
-  .proyecto-row{ display:flex; justify-content:space-between; font-size:.8rem; padding:6px 0; border-bottom:1px solid var(--surface-2); }
-  .proyecto-row .nombre{ font-weight:700; color:var(--text); }
-  .proyecto-row .cifras{ color:var(--text-soft); text-align:right; }
+  .proyecto-row{ display:flex; align-items:center; gap:10px; justify-content:space-between; font-size:.8rem; padding:6px 0; border-bottom:1px solid var(--surface-2); }
+  .proyecto-row .nombre{ font-weight:700; color:var(--text); flex:1; }
+  .proyecto-row .cifras{ color:var(--text-soft); text-align:right; white-space:nowrap; }
+  .proyecto-row .acciones{ display:flex; gap:4px; flex-shrink:0; }
+  .proyecto-row .acciones button{ background:none; border:none; cursor:pointer; font-size:.85rem; padding:2px 4px; line-height:1; }
 
   .mes-header{ font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); margin:18px 0 8px; }
   .mes-header:first-child{ margin-top:0; }

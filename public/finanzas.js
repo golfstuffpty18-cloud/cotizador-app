@@ -265,6 +265,10 @@ async function loadResumen() {
     <div class="proyecto-row">
       <span class="nombre">${escapeHtml(p.proyecto)}</span>
       <span class="cifras">${money(p.ganancia)} <span style="color:var(--gray-400)">(${money(p.emitida)} - ${money(p.gasto)})</span></span>
+      <span class="acciones">
+        <button type="button" class="btn-renombrar-proyecto" data-proyecto="${escapeHtml(p.proyecto)}" title="Renombrar proyecto">✏️</button>
+        <button type="button" class="btn-eliminar-proyecto" data-proyecto="${escapeHtml(p.proyecto)}" title="Quitar la etiqueta de proyecto de sus facturas" style="color:var(--red)">🗑️</button>
+      </span>
     </div>
   `).join('') || '<div class="empty">Sin facturas asociadas a proyectos todavía.</div>';
 
@@ -279,6 +283,36 @@ async function loadResumen() {
     <a class="fin-btn fin-btn-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
        href="/api/finanzas/reporte-anual/pdf?anio=${data.anio}" target="_blank">📊 Generar reporte anual (PDF)</a>
   `;
+
+  document.querySelectorAll('#proyectosTabla .btn-renombrar-proyecto').forEach((btn) => {
+    btn.addEventListener('click', () => renombrarProyecto(btn.dataset.proyecto));
+  });
+  document.querySelectorAll('#proyectosTabla .btn-eliminar-proyecto').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarProyecto(btn.dataset.proyecto));
+  });
+}
+
+async function renombrarProyecto(nombreActual) {
+  const nuevoNombre = prompt(`Nuevo nombre para el proyecto "${nombreActual}":`, nombreActual);
+  if (!nuevoNombre || !nuevoNombre.trim() || nuevoNombre.trim() === nombreActual) return;
+
+  const res = await fetch(`/api/finanzas/proyectos/${encodeURIComponent(nombreActual)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nuevoNombre: nuevoNombre.trim() }),
+  });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error || 'No se pudo renombrar el proyecto'); return; }
+  await Promise.all([loadResumen(), loadFacturas(), loadProyectos()]);
+}
+
+async function eliminarProyecto(nombre) {
+  if (!confirm(`¿Eliminar el proyecto "${nombre}"?\n\nEsto NO borra las facturas, solo les quita la etiqueta de proyecto. Quedarán como facturas sin proyecto asignado.`)) return;
+
+  const res = await fetch(`/api/finanzas/proyectos/${encodeURIComponent(nombre)}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error || 'No se pudo eliminar el proyecto'); return; }
+  await Promise.all([loadResumen(), loadFacturas(), loadProyectos()]);
 }
 
 async function loadProyectos() {
@@ -399,6 +433,7 @@ function renderListaAsignar() {
         <label class="asignar-item ${f.tipo}">
           <input type="checkbox" data-id="${f.id}" ${checked}>
           <span class="desc">${escapeHtml(f.contraparte) || '(sin nombre)'} — ${fecha}${f.numero_factura ? ' · #' + escapeHtml(f.numero_factura) : ''}${otroProyecto ? ` <span style="color:var(--gray-400)">(actualmente: ${escapeHtml(f.proyecto)})</span>` : ''}</span>
+          ${f.archivo_nombre ? `<a href="/api/finanzas/${f.id}/archivo" target="_blank" onclick="event.stopPropagation()" style="font-size:.72rem;color:var(--blue);font-weight:700;text-decoration:none;white-space:nowrap">Ver archivo</a>` : ''}
           <span class="total">${money(f.total)}</span>
         </label>
       `;

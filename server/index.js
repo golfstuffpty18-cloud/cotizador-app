@@ -757,6 +757,30 @@ app.get('/api/finanzas/proyectos', async (req, res) => {
   res.json(rows.map((r) => r.proyecto));
 });
 
+// Renombra un proyecto: reescribe la etiqueta "proyecto" en todas las
+// facturas que la tenían. No crea ni borra facturas, solo el nombre.
+app.put('/api/finanzas/proyectos/:proyecto', async (req, res) => {
+  const nuevoNombre = (req.body && req.body.nuevoNombre || '').trim();
+  if (!nuevoNombre) return res.status(400).json({ error: 'falta el nuevo nombre del proyecto' });
+  const companyId = resolveCompanyId(req);
+  const { rowCount } = await pool.query(
+    `UPDATE finance_invoices SET proyecto = $1 WHERE proyecto = $2 AND company_id = $3`,
+    [nuevoNombre, req.params.proyecto, companyId]
+  );
+  res.json({ ok: true, actualizadas: rowCount });
+});
+
+// "Elimina" un proyecto quitándole la etiqueta a sus facturas (quedan como
+// facturas sin proyecto) -- no borra ninguna factura ni su información.
+app.delete('/api/finanzas/proyectos/:proyecto', async (req, res) => {
+  const companyId = resolveCompanyId(req);
+  const { rowCount } = await pool.query(
+    `UPDATE finance_invoices SET proyecto = NULL WHERE proyecto = $1 AND company_id = $2`,
+    [req.params.proyecto, companyId]
+  );
+  res.json({ ok: true, actualizadas: rowCount });
+});
+
 // Guarda cada PDF generado en finance_reports para poder volver a
 // descargarlo despues sin recalcularlo -- ver GET /api/finanzas/reportes.
 async function guardarReporteGenerado(tipo, nombre, pdfBuffer, companyId) {
