@@ -178,6 +178,16 @@
     <label>Proyecto</label>
     <input type="text" id="asignarProyectoInput" list="proyectosList" placeholder="Ej: Banco General - CCTV">
     <button type="button" class="fin-btn fin-btn-ghost" id="cargarParaAsignarBtn" style="width:100%;margin-bottom:12px">Cargar facturas</button>
+    <div class="filters" id="asignarFiltros" style="display:none">
+      <select id="asignarFiltroTipo">
+        <option value="">Todas</option>
+        <option value="gasto">Gastos</option>
+        <option value="emitida">Emitidas</option>
+      </select>
+      <select id="asignarFiltroAnio"><option value="">Todos los años</option></select>
+      <select id="asignarFiltroMes"><option value="">Todos los meses</option></select>
+      <input type="text" id="asignarBuscar" placeholder="Buscar proveedor/cliente o # factura" style="margin-bottom:0">
+    </div>
     <div id="asignarListaFacturas"></div>
     <button type="button" class="fin-btn fin-btn-primary" id="guardarAsignacionBtn" style="width:100%;display:none">Guardar asignación</button>
     <div id="asignarEstado" style="font-size:.8rem;margin-top:8px;color:var(--gray-600)"></div>

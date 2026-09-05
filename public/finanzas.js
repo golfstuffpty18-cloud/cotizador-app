@@ -291,8 +291,8 @@ async function loadProyectos() {
   sel.value = current;
 }
 
-function populateMesFilter() {
-  const sel = $('filtroMes');
+function populateMesFilter(selId) {
+  const sel = $(selId);
   sel.innerHTML = '<option value="">Todos los meses</option>' +
     MESES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
 }
@@ -331,6 +331,8 @@ async function eliminarReporte(id) {
 // ---------- asignar facturas ya guardadas a un proyecto ----------
 
 let facturasParaAsignar = [];
+let asignarSeleccionados = new Set();
+let asignarProyectoActual = '';
 
 async function cargarParaAsignar() {
   const proyecto = $('asignarProyectoInput').value.trim();
@@ -341,40 +343,102 @@ async function cargarParaAsignar() {
   const res = await fetch('/api/finanzas');
   facturasParaAsignar = await res.json();
 
+  asignarProyectoActual = proyecto;
+  asignarSeleccionados = new Set(facturasParaAsignar.filter((f) => f.proyecto === proyecto).map((f) => f.id));
+
   if (!facturasParaAsignar.length) {
     $('asignarListaFacturas').innerHTML = '<div class="empty">No hay facturas guardadas todavía.</div>';
     $('guardarAsignacionBtn').style.display = 'none';
+    $('asignarFiltros').style.display = 'none';
     return;
   }
 
-  $('asignarListaFacturas').innerHTML = facturasParaAsignar.map((f) => {
-    const fecha = f.fecha ? new Date(f.fecha + 'T00:00:00').toLocaleDateString('es-PA') : 'sin fecha';
-    const checked = f.proyecto === proyecto ? 'checked' : '';
-    return `
-      <label class="asignar-item ${f.tipo}">
-        <input type="checkbox" data-id="${f.id}" ${checked}>
-        <span class="desc">${escapeHtml(f.contraparte) || '(sin nombre)'} — ${fecha}${f.numero_factura ? ' · #' + escapeHtml(f.numero_factura) : ''}${f.proyecto && f.proyecto !== proyecto ? ` <span style="color:var(--gray-400)">(actualmente: ${escapeHtml(f.proyecto)})</span>` : ''}</span>
-        <span class="total">${money(f.total)}</span>
-      </label>
-    `;
-  }).join('');
+  $('asignarFiltroTipo').value = '';
+  $('asignarFiltroMes').value = '';
+  $('asignarBuscar').value = '';
+  populateAsignarFiltroAnio();
+  $('asignarFiltros').style.display = 'grid';
+
+  renderListaAsignar();
+}
+
+function populateAsignarFiltroAnio() {
+  const anios = [...new Set(facturasParaAsignar.filter((f) => f.fecha).map((f) => f.fecha.slice(0, 4)))].sort().reverse();
+  $('asignarFiltroAnio').innerHTML = '<option value="">Todos los años</option>' + anios.map((a) => `<option value="${a}">${a}</option>`).join('');
+}
+
+function renderListaAsignar() {
+  const tipo = $('asignarFiltroTipo').value;
+  const anio = $('asignarFiltroAnio').value;
+  const mes = $('asignarFiltroMes').value;
+  const buscar = $('asignarBuscar').value.trim().toLowerCase();
+
+  const visibles = facturasParaAsignar.filter((f) => {
+    if (tipo && f.tipo !== tipo) return false;
+    if (anio || mes) {
+      if (!f.fecha) return false;
+      const [fy, fm] = f.fecha.split('-');
+      if (anio && fy !== anio) return false;
+      if (mes && String(Number(fm)) !== mes) return false;
+    }
+    if (buscar) {
+      const texto = `${f.contraparte || ''} ${f.numero_factura || ''}`.toLowerCase();
+      if (!texto.includes(buscar)) return false;
+    }
+    return true;
+  });
+
+  if (!visibles.length) {
+    $('asignarListaFacturas').innerHTML = '<div class="empty">Ninguna factura coincide con estos filtros.</div>';
+  } else {
+    $('asignarListaFacturas').innerHTML = visibles.map((f) => {
+      const fecha = f.fecha ? new Date(f.fecha + 'T00:00:00').toLocaleDateString('es-PA') : 'sin fecha';
+      const checked = asignarSeleccionados.has(f.id) ? 'checked' : '';
+      const otroProyecto = f.proyecto && f.proyecto !== asignarProyectoActual;
+      return `
+        <label class="asignar-item ${f.tipo}">
+          <input type="checkbox" data-id="${f.id}" ${checked}>
+          <span class="desc">${escapeHtml(f.contraparte) || '(sin nombre)'} — ${fecha}${f.numero_factura ? ' · #' + escapeHtml(f.numero_factura) : ''}${otroProyecto ? ` <span style="color:var(--gray-400)">(actualmente: ${escapeHtml(f.proyecto)})</span>` : ''}</span>
+          <span class="total">${money(f.total)}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  document.querySelectorAll('#asignarListaFacturas input[type="checkbox"]').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      const id = Number(chk.dataset.id);
+      if (chk.checked) asignarSeleccionados.add(id);
+      else asignarSeleccionados.delete(id);
+    });
+  });
+
   $('guardarAsignacionBtn').style.display = 'block';
 }
 
 $('cargarParaAsignarBtn').addEventListener('click', cargarParaAsignar);
+$('asignarFiltroTipo').addEventListener('change', renderListaAsignar);
+$('asignarFiltroAnio').addEventListener('change', renderListaAsignar);
+$('asignarFiltroMes').addEventListener('change', renderListaAsignar);
+$('asignarBuscar').addEventListener('input', renderListaAsignar);
 
 $('guardarAsignacionBtn').addEventListener('click', async () => {
-  const proyecto = $('asignarProyectoInput').value.trim();
+  const proyecto = asignarProyectoActual;
   if (!proyecto) return;
 
   const asignar = [];
   const desasignar = [];
-  document.querySelectorAll('#asignarListaFacturas input[type="checkbox"]').forEach((chk) => {
-    const id = Number(chk.dataset.id);
-    const factura = facturasParaAsignar.find((f) => f.id === id);
-    if (chk.checked) asignar.push(id);
-    else if (factura && factura.proyecto === proyecto) desasignar.push(id);
+  facturasParaAsignar.forEach((f) => {
+    const marcada = asignarSeleccionados.has(f.id);
+    const yaAsignada = f.proyecto === proyecto;
+    if (marcada && !yaAsignada) asignar.push(f.id);
+    else if (!marcada && yaAsignada) desasignar.push(f.id);
   });
+
+  if (!asignar.length && !desasignar.length) {
+    $('asignarEstado').textContent = 'No hay cambios que guardar.';
+    return;
+  }
 
   $('guardarAsignacionBtn').disabled = true;
   $('asignarEstado').textContent = 'Guardando…';
@@ -476,7 +540,8 @@ $('filtroProyecto').addEventListener('change', loadFacturas);
 $('filtroAnio').addEventListener('change', loadResumen);
 
 populateAnioFilter();
-populateMesFilter();
+populateMesFilter('filtroMes');
+populateMesFilter('asignarFiltroMes');
 updateTipoToggleClasses();
 loadResumen();
 loadReportes();
