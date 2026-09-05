@@ -291,6 +291,111 @@ async function loadProyectos() {
   sel.value = current;
 }
 
+function populateMesFilter() {
+  const sel = $('filtroMes');
+  sel.innerHTML = '<option value="">Todos los meses</option>' +
+    MESES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+}
+
+async function loadReportes() {
+  const res = await fetch('/api/finanzas/reportes');
+  const reportes = await res.json();
+  if (!reportes.length) {
+    $('listaReportes').innerHTML = '<div class="empty">Todavía no has generado ningún reporte.</div>';
+    return;
+  }
+  $('listaReportes').innerHTML = reportes.map((r) => {
+    const nombre = r.tipo === 'anual' ? `Reporte anual ${r.nombre}` : `Reporte: ${r.nombre}`;
+    const fecha = new Date(r.created_at).toLocaleString('es-PA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="reporte-item">
+        <div>
+          <div class="nombre">${escapeHtml(nombre)}</div>
+          <div class="fecha">Generado el ${fecha}</div>
+        </div>
+        <div class="acciones">
+          <a href="/api/finanzas/reportes/${r.id}/pdf" target="_blank">Descargar</a>
+          <button onclick="eliminarReporte(${r.id})" style="color:var(--red)">Eliminar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function eliminarReporte(id) {
+  if (!confirm('¿Eliminar este reporte guardado? Esta acción no se puede deshacer.')) return;
+  await fetch(`/api/finanzas/reportes/${id}`, { method: 'DELETE' });
+  loadReportes();
+}
+
+// ---------- asignar facturas ya guardadas a un proyecto ----------
+
+let facturasParaAsignar = [];
+
+async function cargarParaAsignar() {
+  const proyecto = $('asignarProyectoInput').value.trim();
+  if (!proyecto) { $('asignarEstado').textContent = 'Escribe o elige un proyecto primero.'; return; }
+
+  $('asignarListaFacturas').innerHTML = '<div class="spinner">Cargando facturas…</div>';
+  $('asignarEstado').textContent = '';
+  const res = await fetch('/api/finanzas');
+  facturasParaAsignar = await res.json();
+
+  if (!facturasParaAsignar.length) {
+    $('asignarListaFacturas').innerHTML = '<div class="empty">No hay facturas guardadas todavía.</div>';
+    $('guardarAsignacionBtn').style.display = 'none';
+    return;
+  }
+
+  $('asignarListaFacturas').innerHTML = facturasParaAsignar.map((f) => {
+    const fecha = f.fecha ? new Date(f.fecha + 'T00:00:00').toLocaleDateString('es-PA') : 'sin fecha';
+    const checked = f.proyecto === proyecto ? 'checked' : '';
+    return `
+      <label class="asignar-item ${f.tipo}">
+        <input type="checkbox" data-id="${f.id}" ${checked}>
+        <span class="desc">${escapeHtml(f.contraparte) || '(sin nombre)'} — ${fecha}${f.numero_factura ? ' · #' + escapeHtml(f.numero_factura) : ''}${f.proyecto && f.proyecto !== proyecto ? ` <span style="color:var(--gray-400)">(actualmente: ${escapeHtml(f.proyecto)})</span>` : ''}</span>
+        <span class="total">${money(f.total)}</span>
+      </label>
+    `;
+  }).join('');
+  $('guardarAsignacionBtn').style.display = 'block';
+}
+
+$('cargarParaAsignarBtn').addEventListener('click', cargarParaAsignar);
+
+$('guardarAsignacionBtn').addEventListener('click', async () => {
+  const proyecto = $('asignarProyectoInput').value.trim();
+  if (!proyecto) return;
+
+  const asignar = [];
+  const desasignar = [];
+  document.querySelectorAll('#asignarListaFacturas input[type="checkbox"]').forEach((chk) => {
+    const id = Number(chk.dataset.id);
+    const factura = facturasParaAsignar.find((f) => f.id === id);
+    if (chk.checked) asignar.push(id);
+    else if (factura && factura.proyecto === proyecto) desasignar.push(id);
+  });
+
+  $('guardarAsignacionBtn').disabled = true;
+  $('asignarEstado').textContent = 'Guardando…';
+  try {
+    const res = await fetch('/api/finanzas/asignar-proyecto', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proyecto, asignar, desasignar }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'no se pudo guardar');
+    $('asignarEstado').textContent = `✅ ${data.asignadas} factura(s) asignada(s), ${data.desasignadas} quitada(s) de "${proyecto}".`;
+    await Promise.all([loadResumen(), loadFacturas(), loadProyectos()]);
+    cargarParaAsignar();
+  } catch (err) {
+    $('asignarEstado').textContent = '❌ ' + err.message;
+  } finally {
+    $('guardarAsignacionBtn').disabled = false;
+  }
+});
+
 function populateAnioFilter() {
   const sel = $('filtroAnio');
   const current = new Date().getFullYear();
@@ -337,6 +442,7 @@ async function loadFacturas() {
   actualizarBotonReporteProyecto();
   const params = new URLSearchParams();
   if ($('filtroTipo').value) params.set('tipo', $('filtroTipo').value);
+  if ($('filtroMes').value) params.set('mes', $('filtroMes').value);
   if ($('filtroProyecto').value) params.set('proyecto', $('filtroProyecto').value);
 
   $('listaFacturas').innerHTML = '<div class="spinner">Cargando…</div>';
@@ -365,11 +471,14 @@ async function loadFacturas() {
 }
 
 $('filtroTipo').addEventListener('change', loadFacturas);
+$('filtroMes').addEventListener('change', loadFacturas);
 $('filtroProyecto').addEventListener('change', loadFacturas);
 $('filtroAnio').addEventListener('change', loadResumen);
 
 populateAnioFilter();
+populateMesFilter();
 updateTipoToggleClasses();
 loadResumen();
+loadReportes();
 loadProyectos();
 loadFacturas();

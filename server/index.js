@@ -722,6 +722,33 @@ app.get('/api/finanzas', async (req, res) => {
   res.json(rows);
 });
 
+// Asigna (o desasigna) en un solo golpe qué facturas ya guardadas
+// pertenecen a un proyecto -- alternativa a editar factura por factura para
+// escribirle el nombre del proyecto a mano. "asignar" son los ids que
+// quedan CON ese proyecto; "desasignar" son ids que tenían ese mismo
+// proyecto y se les quita (se marcaron como "no" en la pantalla).
+app.put('/api/finanzas/asignar-proyecto', async (req, res) => {
+  const { proyecto, asignar, desasignar } = req.body || {};
+  if (!proyecto || !proyecto.trim()) return res.status(400).json({ error: 'falta el nombre del proyecto' });
+  const companyId = resolveCompanyId(req);
+  const idsAsignar = Array.isArray(asignar) ? asignar.map(Number).filter(Boolean) : [];
+  const idsDesasignar = Array.isArray(desasignar) ? desasignar.map(Number).filter(Boolean) : [];
+
+  if (idsAsignar.length) {
+    await pool.query(
+      `UPDATE finance_invoices SET proyecto = $1 WHERE id = ANY($2::int[]) AND company_id = $3`,
+      [proyecto.trim(), idsAsignar, companyId]
+    );
+  }
+  if (idsDesasignar.length) {
+    await pool.query(
+      `UPDATE finance_invoices SET proyecto = NULL WHERE id = ANY($1::int[]) AND company_id = $2`,
+      [idsDesasignar, companyId]
+    );
+  }
+  res.json({ ok: true, asignadas: idsAsignar.length, desasignadas: idsDesasignar.length });
+});
+
 app.get('/api/finanzas/proyectos', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT DISTINCT proyecto FROM finance_invoices WHERE proyecto IS NOT NULL AND proyecto != '' AND company_id = $1 ORDER BY proyecto`,
@@ -730,17 +757,54 @@ app.get('/api/finanzas/proyectos', async (req, res) => {
   res.json(rows.map((r) => r.proyecto));
 });
 
+// Guarda cada PDF generado en finance_reports para poder volver a
+// descargarlo despues sin recalcularlo -- ver GET /api/finanzas/reportes.
+async function guardarReporteGenerado(tipo, nombre, pdfBuffer, companyId) {
+  await pool.query(
+    `INSERT INTO finance_reports (company_id, tipo, nombre, pdf) VALUES ($1,$2,$3,$4)`,
+    [companyId, tipo, nombre, pdfBuffer]
+  );
+}
+
 app.get('/api/finanzas/proyecto/:proyecto/pdf', async (req, res) => {
+  const companyId = resolveCompanyId(req);
   const { rows } = await pool.query(
     `SELECT tipo, contraparte, numero_factura, fecha, total FROM finance_invoices
      WHERE proyecto = $1 AND company_id = $2 ORDER BY fecha`,
-    [req.params.proyecto, resolveCompanyId(req)]
+    [req.params.proyecto, companyId]
   );
   if (!rows.length) return res.status(404).json({ error: 'No hay facturas registradas para ese proyecto.' });
   const pdfBuffer = await generateProjectReportPdf({ proyecto: req.params.proyecto, facturas: rows });
+  await guardarReporteGenerado('proyecto', req.params.proyecto, pdfBuffer, companyId);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="Reporte ${req.params.proyecto}.pdf"`);
   res.send(pdfBuffer);
+});
+
+app.get('/api/finanzas/reportes', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, tipo, nombre, created_at FROM finance_reports WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100`,
+    [resolveCompanyId(req)]
+  );
+  res.json(rows);
+});
+
+app.get('/api/finanzas/reportes/:id/pdf', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT tipo, nombre, pdf FROM finance_reports WHERE id = $1 AND company_id = $2`,
+    [req.params.id, resolveCompanyId(req)]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'no encontrado' });
+  const { tipo, nombre, pdf } = rows[0];
+  const etiqueta = tipo === 'anual' ? `Reporte anual ${nombre}` : `Reporte ${nombre}`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${etiqueta}.pdf"`);
+  res.send(pdf);
+});
+
+app.delete('/api/finanzas/reportes/:id', async (req, res) => {
+  await pool.query('DELETE FROM finance_reports WHERE id = $1 AND company_id = $2', [req.params.id, resolveCompanyId(req)]);
+  res.json({ ok: true });
 });
 
 // Ganancia = total emitido - total de gastos, tanto del año consultado como
@@ -799,8 +863,10 @@ app.get('/api/finanzas/resumen', async (req, res) => {
 
 app.get('/api/finanzas/reporte-anual/pdf', async (req, res) => {
   const anio = req.query.anio || new Date().getFullYear();
-  const resumen = await calcularResumenAnual(anio, resolveCompanyId(req));
+  const companyId = resolveCompanyId(req);
+  const resumen = await calcularResumenAnual(anio, companyId);
   const pdfBuffer = await generateAnnualReportPdf(resumen);
+  await guardarReporteGenerado('anual', String(resumen.anio), pdfBuffer, companyId);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="Reporte anual ${resumen.anio}.pdf"`);
   res.send(pdfBuffer);

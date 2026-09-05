@@ -213,6 +213,20 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(event_date);
 ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;
 
+-- Guarda cada reporte financiero (anual o por proyecto) ya generado, para
+-- volver a descargarlo despues sin tener que recalcularlo -- el usuario
+-- pidio poder ver una lista de reportes anteriores por fecha en vez de que
+-- cada descarga sea siempre "generar de nuevo".
+CREATE TABLE IF NOT EXISTS finance_reports (
+  id SERIAL PRIMARY KEY,
+  company_id INTEGER REFERENCES companies(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('anual','proyecto')),
+  nombre TEXT NOT NULL,
+  pdf BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_finance_reports_created ON finance_reports(created_at);
+
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS entity_address TEXT;

@@ -49,7 +49,7 @@
   .review-form.show{ display:block; }
   .aviso-baja{ background:var(--amber-bg); color:var(--amber); font-size:.76rem; padding:8px 10px; border-radius:8px; margin-bottom:10px; }
 
-  .filters{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+  .filters{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
   .filters select{ margin-bottom:0; }
 
   .resumen-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
@@ -83,6 +83,21 @@
 
   .spinner{ text-align:center; color:var(--text-soft); font-size:.82rem; padding:16px; }
   .error-msg{ background:var(--red-bg); color:var(--red); font-size:.8rem; padding:8px 10px; border-radius:8px; margin-bottom:10px; }
+
+  .asignar-item{ display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); font-size:.82rem; }
+  .asignar-item:last-child{ border-bottom:none; }
+  .asignar-item input[type="checkbox"]{ width:auto; margin:0; flex-shrink:0; }
+  .asignar-item .desc{ flex:1; color:var(--text); }
+  .asignar-item .total{ font-weight:700; white-space:nowrap; }
+  .asignar-item.gasto .total{ color:var(--red); }
+  .asignar-item.emitida .total{ color:var(--green); }
+
+  .reporte-item{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:.82rem; }
+  .reporte-item:last-child{ border-bottom:none; }
+  .reporte-item .nombre{ font-weight:700; color:var(--text); }
+  .reporte-item .fecha{ color:var(--text-soft); font-size:.74rem; }
+  .reporte-item .acciones{ display:flex; gap:8px; }
+  .reporte-item .acciones a, .reporte-item .acciones button{ font-size:.74rem; padding:5px 10px; border-radius:999px; border:2px solid var(--border); background:var(--surface); color:var(--text); text-decoration:none; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -93,6 +108,11 @@
   <section id="resumenSection">
     <h2>Resumen del año</h2>
     <div id="resumenBody">Cargando…</div>
+  </section>
+
+  <section>
+    <h2>Reportes generados</h2>
+    <div id="listaReportes">Cargando…</div>
   </section>
 
   <section>
@@ -153,6 +173,17 @@
   </section>
 
   <section>
+    <h2>Asignar facturas a un proyecto</h2>
+    <p style="font-size:.8rem;color:var(--gray-600);margin:0 0 12px">Elige un proyecto (o escribe uno nuevo), marca qué facturas ya guardadas le pertenecen, y guarda — no hace falta editar cada factura una por una.</p>
+    <label>Proyecto</label>
+    <input type="text" id="asignarProyectoInput" list="proyectosList" placeholder="Ej: Banco General - CCTV">
+    <button type="button" class="fin-btn fin-btn-ghost" id="cargarParaAsignarBtn" style="width:100%;margin-bottom:12px">Cargar facturas</button>
+    <div id="asignarListaFacturas"></div>
+    <button type="button" class="fin-btn fin-btn-primary" id="guardarAsignacionBtn" style="width:100%;display:none">Guardar asignación</button>
+    <div id="asignarEstado" style="font-size:.8rem;margin-top:8px;color:var(--gray-600)"></div>
+  </section>
+
+  <section>
     <h2>Facturas guardadas</h2>
     <div class="filters">
       <select id="filtroTipo">
@@ -161,6 +192,7 @@
         <option value="emitida">Emitidas</option>
       </select>
       <select id="filtroAnio"></select>
+      <select id="filtroMes"><option value="">Todos los meses</option></select>
       <select id="filtroProyecto"><option value="">Todos los proyectos</option></select>
     </div>
     <a id="reporteProyectoBtn" class="fin-btn fin-btn-ghost" style="display:none;text-align:center;text-decoration:none;margin-bottom:14px" target="_blank">📄 Generar reporte de este proyecto</a>
