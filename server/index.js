@@ -26,6 +26,7 @@ const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
 const { extractInvoiceData } = require('../shared/claudeInvoice');
 const { signDocument } = require('../shared/generateSignedDocument');
+const { generateAnnualReportPdf } = require('../shared/generateAnnualReportPdf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -732,9 +733,13 @@ app.get('/api/finanzas/proyectos', async (req, res) => {
 // desglosado por proyecto (a partir del texto libre que el usuario escribe
 // al guardar cada factura — ver nota en finanzas.html sobre por qué no es
 // una FK a opportunities).
-app.get('/api/finanzas/resumen', async (req, res) => {
-  const anio = req.query.anio || new Date().getFullYear();
-  const companyId = resolveCompanyId(req);
+// Compartido entre el resumen en pantalla y el PDF del reporte anual, para
+// que ambos muestren exactamente los mismos números. "Gastos generales" son
+// los que NO se asociaron a ningún proyecto (proyecto NULL o vacío) --
+// arriendo, planilla, servicios, etc. -- que igual hay que verlos para que
+// la ganancia neta del año cuadre con la suma de ganancia por proyecto menos
+// esos gastos, y no solo con los gastos que sí se etiquetaron con un proyecto.
+async function calcularResumenAnual(anio, companyId) {
   const { rows: porAnio } = await pool.query(
     `SELECT tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices WHERE EXTRACT(YEAR FROM fecha) = $1 AND company_id = $2 GROUP BY tipo`,
     [anio, companyId]
@@ -743,6 +748,12 @@ app.get('/api/finanzas/resumen', async (req, res) => {
     `SELECT proyecto, tipo, COALESCE(SUM(total),0) AS total FROM finance_invoices
      WHERE proyecto IS NOT NULL AND proyecto != '' AND company_id = $1 GROUP BY proyecto, tipo ORDER BY proyecto`,
     [companyId]
+  );
+  const { rows: gastosGeneralesPorMes } = await pool.query(
+    `SELECT to_char(fecha, 'YYYY-MM') AS mes, COALESCE(SUM(total),0) AS total FROM finance_invoices
+     WHERE tipo = 'gasto' AND (proyecto IS NULL OR proyecto = '') AND EXTRACT(YEAR FROM fecha) = $1 AND company_id = $2
+     GROUP BY mes ORDER BY mes`,
+    [anio, companyId]
   );
 
   const totales = { emitida: 0, gasto: 0 };
@@ -754,14 +765,31 @@ app.get('/api/finanzas/resumen', async (req, res) => {
     proyectos[r.proyecto][r.tipo] = Number(r.total);
   }
   const por_proyecto = Object.values(proyectos).map((p) => ({ ...p, ganancia: p.emitida - p.gasto }));
+  const total_gastos_generales = gastosGeneralesPorMes.reduce((s, r) => s + Number(r.total), 0);
 
-  res.json({
+  return {
     anio: Number(anio),
     total_emitido: totales.emitida,
     total_gastos: totales.gasto,
+    total_gastos_generales,
     ganancia: totales.emitida - totales.gasto,
     por_proyecto,
-  });
+    gastos_generales_por_mes: gastosGeneralesPorMes.map((r) => ({ mes: r.mes, total: Number(r.total) })),
+  };
+}
+
+app.get('/api/finanzas/resumen', async (req, res) => {
+  const anio = req.query.anio || new Date().getFullYear();
+  res.json(await calcularResumenAnual(anio, resolveCompanyId(req)));
+});
+
+app.get('/api/finanzas/reporte-anual/pdf', async (req, res) => {
+  const anio = req.query.anio || new Date().getFullYear();
+  const resumen = await calcularResumenAnual(anio, resolveCompanyId(req));
+  const pdfBuffer = await generateAnnualReportPdf(resumen);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="Reporte anual ${resumen.anio}.pdf"`);
+  res.send(pdfBuffer);
 });
 
 app.get('/api/finanzas/:id', async (req, res) => {

@@ -276,6 +276,8 @@ async function loadResumen() {
     </div>
     <div class="proyectos-toggle" onclick="toggleProyectosTabla()">Ver ganancia por proyecto ▾</div>
     <div id="proyectosTabla">${filas}</div>
+    <a class="fin-btn fin-btn-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
+       href="/api/finanzas/reporte-anual/pdf?anio=${data.anio}" target="_blank">📊 Generar reporte anual (PDF)</a>
   `;
 }
 
