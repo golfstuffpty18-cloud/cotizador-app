@@ -322,7 +322,19 @@ function facturaCard(f) {
   `;
 }
 
+function actualizarBotonReporteProyecto() {
+  const proyecto = $('filtroProyecto').value;
+  const btn = $('reporteProyectoBtn');
+  if (proyecto) {
+    btn.href = `/api/finanzas/proyecto/${encodeURIComponent(proyecto)}/pdf`;
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
 async function loadFacturas() {
+  actualizarBotonReporteProyecto();
   const params = new URLSearchParams();
   if ($('filtroTipo').value) params.set('tipo', $('filtroTipo').value);
   if ($('filtroProyecto').value) params.set('proyecto', $('filtroProyecto').value);

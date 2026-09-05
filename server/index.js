@@ -27,6 +27,7 @@ const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizaci
 const { extractInvoiceData } = require('../shared/claudeInvoice');
 const { signDocument } = require('../shared/generateSignedDocument');
 const { generateAnnualReportPdf } = require('../shared/generateAnnualReportPdf');
+const { generateProjectReportPdf } = require('../shared/generateProjectReportPdf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -727,6 +728,19 @@ app.get('/api/finanzas/proyectos', async (req, res) => {
     [resolveCompanyId(req)]
   );
   res.json(rows.map((r) => r.proyecto));
+});
+
+app.get('/api/finanzas/proyecto/:proyecto/pdf', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT tipo, contraparte, numero_factura, fecha, total FROM finance_invoices
+     WHERE proyecto = $1 AND company_id = $2 ORDER BY fecha`,
+    [req.params.proyecto, resolveCompanyId(req)]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'No hay facturas registradas para ese proyecto.' });
+  const pdfBuffer = await generateProjectReportPdf({ proyecto: req.params.proyecto, facturas: rows });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="Reporte ${req.params.proyecto}.pdf"`);
+  res.send(pdfBuffer);
 });
 
 // Ganancia = total emitido - total de gastos, tanto del año consultado como
