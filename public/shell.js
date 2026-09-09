@@ -46,6 +46,7 @@ function renderShell(meta) {
   const topbar = document.createElement('header');
   topbar.className = 'topbar';
   topbar.innerHTML = `
+    <button class="topbar-back" id="btnBack" title="Atrás">${icon('back', 18)}</button>
     <div class="topbar-brand">
       <img src="${BRAND.logo}" alt="">
       <span class="topbar-brand-name">${BRAND.name}</span>
@@ -82,6 +83,11 @@ function renderShell(meta) {
   appBody.appendChild(contentEl);
 
   shellEl.replaceWith(topbar, appBody);
+
+  document.getElementById('btnBack').addEventListener('click', () => {
+    if (history.length > 1) history.back();
+    else location.href = '/index.html';
+  });
 
   if (meta && (meta.title || meta.subtitle)) {
     const greeting = document.createElement('div');

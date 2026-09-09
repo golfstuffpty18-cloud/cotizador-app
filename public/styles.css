@@ -76,6 +76,13 @@ h1, h2, h3, p { margin: 0; }
   padding: 12px 22px;
   position: sticky; top: 0; z-index: 20;
 }
+.topbar-back {
+  width: 34px; height: 34px; border-radius: 999px; border: none;
+  background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.85); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.topbar-back:hover { background: rgba(255, 255, 255, 0.16); }
+
 .topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .topbar-brand img { width: var(--topbar-logo-size); height: var(--topbar-logo-size); border-radius: 14px; object-fit: cover; }
 .topbar-brand-name { font-size: 1rem; font-weight: 800; white-space: nowrap; }
