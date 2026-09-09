@@ -118,7 +118,7 @@ function render(opp, quote) {
 
     <section>
       <h2>${locked ? 'Cotización aprobada' : 'Vista previa'}</h2>
-      ${hasDraft ? renderPreview(quote) : `<p style="font-size:.85rem;color:var(--gray-400)">Todavía no has subido un Excel con precios.</p>`}
+      ${hasDraft ? renderPreview(quote, !locked) : `<p style="font-size:.85rem;color:var(--gray-400)">Todavía no has subido un Excel con precios.</p>`}
     </section>
 
     ${hasDraft ? renderProfitAnalysis(quote) : ''}
@@ -213,6 +213,72 @@ function render(opp, quote) {
     msg.textContent = 'Cotización aprobada ✅';
     load();
   });
+
+  const itemsEditor = document.getElementById('itemsEditor');
+  if (itemsEditor) {
+    const btnAddItem = document.getElementById('btnAddItem');
+    const btnGuardarItems = document.getElementById('btnGuardarItems');
+    const itemsMsg = document.getElementById('itemsMsg');
+
+    btnAddItem.addEventListener('click', () => {
+      itemsEditor.insertAdjacentHTML('beforeend', itemEditorRow({}));
+    });
+
+    itemsEditor.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('qi-rm')) return;
+      e.target.closest('.qi-row').remove();
+    });
+
+    itemsEditor.addEventListener('input', (e) => {
+      if (!e.target.classList.contains('qi-cant') && !e.target.classList.contains('qi-precio')) return;
+      const row = e.target.closest('.qi-row');
+      const cant = Number(row.querySelector('.qi-cant').value) || 0;
+      const precio = Number(row.querySelector('.qi-precio').value) || 0;
+      row.querySelector('.qi-subtotal').textContent = `Subtotal: ${money(cant * precio)}`;
+    });
+
+    btnGuardarItems.addEventListener('click', async () => {
+      const items = [...itemsEditor.querySelectorAll('.qi-row')].map((row, idx) => ({
+        numRenglon: idx + 1,
+        descripcion: row.querySelector('.qi-desc').value.trim(),
+        modelo: row.querySelector('.qi-modelo').value.trim(),
+        unidad: row.dataset.unidad || '',
+        cantidad: Number(row.querySelector('.qi-cant').value) || 0,
+        precioUnitario: Number(row.querySelector('.qi-precio').value) || 0,
+        costoDistribuidor: Number(row.dataset.costo) || 0,
+        margenG: Number(row.dataset.margen) || 0,
+        precioReferencia: Number(row.dataset.precioRef) || 0,
+      })).filter((i) => i.descripcion);
+
+      if (!items.length) { itemsMsg.textContent = 'Agrega al menos un ítem con descripción antes de guardar.'; return; }
+
+      btnGuardarItems.disabled = true;
+      itemsMsg.textContent = 'Guardando…';
+      try {
+        const res = await fetch(`/api/opportunities/${oppId}/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cliente_nombre: quote.cliente_nombre,
+            cliente_ruc: quote.cliente_ruc,
+            cliente_direccion: quote.cliente_direccion,
+            cliente_ciudad: quote.cliente_ciudad,
+            forma_pago: quote.forma_pago,
+            comentarios: quote.comentarios,
+            itbm_rate: quote.itbm_rate,
+            items,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { itemsMsg.textContent = '❌ ' + (data.error || 'No se pudo guardar'); return; }
+        load();
+      } catch (err) {
+        itemsMsg.textContent = '❌ Error al guardar: ' + err.message;
+      } finally {
+        btnGuardarItems.disabled = false;
+      }
+    });
+  }
 }
 
 function renderDocumentos(opp) {
@@ -240,16 +306,23 @@ function renderDocumentos(opp) {
   `;
 }
 
-function renderPreview(quote) {
-  const rows = quote.items.map(i => `
-    <div class="item">
-      <div class="desc">${i.numRenglon}. ${escapeHtml(i.descripcion)}</div>
-      <div class="meta">
-        ${i.modelo ? 'Modelo: ' + escapeHtml(i.modelo) + ' · ' : ''}Cantidad: ${i.cantidad} ${escapeHtml(i.unidad || '')}
+function renderPreview(quote, editable) {
+  const rows = editable
+    ? `
+      <div id="itemsEditor">${quote.items.map(itemEditorRow).join('')}</div>
+      <button type="button" class="qt-btn qt-btn-add" id="btnAddItem" style="width:100%;margin-bottom:6px">＋ Agregar ítem</button>
+      <button type="button" class="qt-btn qt-btn-ghost" id="btnGuardarItems" style="width:100%">Guardar cambios de ítems</button>
+      <div id="itemsMsg" style="font-size:.78rem;color:var(--gray-600);margin-top:6px;text-align:center"></div>
+    `
+    : quote.items.map(i => `
+      <div class="item">
+        <div class="desc">${i.numRenglon}. ${escapeHtml(i.descripcion)}</div>
+        <div class="meta">
+          ${i.modelo ? 'Modelo: ' + escapeHtml(i.modelo) + ' · ' : ''}Cantidad: ${i.cantidad} ${escapeHtml(i.unidad || '')}
+        </div>
+        <div class="subtotal">Precio unitario: ${money(i.precioUnitario)} · Subtotal: <b>${money((i.cantidad || 0) * (i.precioUnitario || 0))}</b></div>
       </div>
-      <div class="subtotal">Precio unitario: ${money(i.precioUnitario)} · Subtotal: <b>${money((i.cantidad || 0) * (i.precioUnitario || 0))}</b></div>
-    </div>
-  `).join('');
+    `).join('');
 
   return `
     <p style="font-size:.85rem;margin:0 0 10px">
@@ -264,6 +337,44 @@ function renderPreview(quote) {
       <div class="line"><span>Subtotal</span><span>${money(quote.subtotal)}</span></div>
       <div class="line"><span>${itbmLabel(quote)}</span><span>${money(quote.itbm)}</span></div>
       <div class="line total"><span>TOTAL</span><span>${money(quote.total)}</span></div>
+    </div>
+    ${editable ? `<p style="font-size:.72rem;color:var(--gray-400);margin-top:6px;text-align:right">Los totales se actualizan al guardar los cambios de ítems.</p>` : ''}
+  `;
+}
+
+// Ítem editable dentro de "Vista previa" -- misma info que ya trae cada
+// renglón del Excel subido (Paso 2), pero corregible aquí mismo sin tener
+// que bajar el Excel, editarlo y volver a subirlo por un cambio pequeño.
+// costoDistribuidor/margenG/precioReferencia no son editables desde acá (son
+// del cálculo de precio sugerido del Excel) -- se guardan en el propio
+// renglón vía data-* para no perderlos al guardar sin tocarlos.
+function itemEditorRow(i) {
+  return `
+    <div class="item qi-row" data-costo="${Number(i.costoDistribuidor) || 0}" data-margen="${Number(i.margenG) || 0}" data-precio-ref="${Number(i.precioReferencia) || 0}" data-unidad="${escapeHtml(i.unidad || '')}">
+      <div class="row2">
+        <div>
+          <label>Descripción</label>
+          <input type="text" class="qi-desc" value="${escapeHtml(i.descripcion || '')}">
+        </div>
+        <div>
+          <label>Modelo (opcional)</label>
+          <input type="text" class="qi-modelo" value="${escapeHtml(i.modelo || '')}">
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Cantidad</label>
+          <input type="number" class="qi-cant" min="0" step="1" value="${i.cantidad != null ? i.cantidad : ''}">
+        </div>
+        <div>
+          <label>Precio unitario</label>
+          <input type="number" class="qi-precio" min="0" step="0.01" value="${i.precioUnitario != null ? i.precioUnitario : ''}">
+        </div>
+      </div>
+      <div class="qi-foot">
+        <span class="qi-subtotal">Subtotal: ${money((Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0))}</span>
+        <button type="button" class="qi-rm">Quitar ítem ✕</button>
+      </div>
     </div>
   `;
 }
