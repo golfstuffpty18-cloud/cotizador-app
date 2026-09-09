@@ -237,6 +237,34 @@ function render(opp, quote) {
       row.querySelector('.qi-subtotal').textContent = `Subtotal: ${money(cant * precio)}`;
     });
 
+    // Predicción de texto: mientras se escribe la descripción de un ítem, si
+    // ya hay categoría (viene de la oportunidad), sugiere ítems del catálogo
+    // de esa misma categoría en vez de que el usuario tenga que recordar el
+    // nombre exacto que ya usó antes -- mismo patrón que ya existe en
+    // Cotizaciones directas (directo.js).
+    let suggDebounce;
+    itemsEditor.addEventListener('input', (e) => {
+      if (!e.target.classList.contains('qi-desc')) return;
+      const descInput = e.target;
+      const suggList = descInput.parentElement.querySelector('.sugg-list');
+      clearTimeout(suggDebounce);
+      const q = descInput.value.trim();
+      if (!opp.category || q.length < 2) { suggList.innerHTML = ''; suggList.style.display = 'none'; return; }
+      suggDebounce = setTimeout(() => fetchQuoteSuggestions(q, suggList, descInput, opp.category), 250);
+    });
+
+    itemsEditor.addEventListener('focusin', (e) => {
+      if (!e.target.classList.contains('qi-desc')) return;
+      const suggList = e.target.parentElement.querySelector('.sugg-list');
+      if (suggList.innerHTML) suggList.style.display = 'block';
+    });
+
+    itemsEditor.addEventListener('focusout', (e) => {
+      if (!e.target.classList.contains('qi-desc')) return;
+      const suggList = e.target.parentElement.querySelector('.sugg-list');
+      setTimeout(() => { suggList.style.display = 'none'; }, 150);
+    });
+
     btnGuardarItems.addEventListener('click', async () => {
       const items = [...itemsEditor.querySelectorAll('.qi-row')].map((row, idx) => ({
         numRenglon: idx + 1,
@@ -342,6 +370,29 @@ function renderPreview(quote, editable) {
   `;
 }
 
+// Busca en el catálogo (misma categoría de la oportunidad) ítems cuya
+// descripción coincida con lo que se va escribiendo, para sugerirlos en vez
+// de que el usuario tenga que teclear el nombre exacto que ya usó antes.
+async function fetchQuoteSuggestions(q, suggList, descInput, categoria) {
+  const items = await fetch(`/api/catalog?categoria=${encodeURIComponent(categoria)}&search=${encodeURIComponent(q)}`)
+    .then(r => r.ok ? r.json() : []);
+  if (!items.length) { suggList.innerHTML = ''; suggList.style.display = 'none'; return; }
+  suggList.innerHTML = items.slice(0, 6).map(it => `
+    <div class="sugg-item" data-desc="${escapeHtml(it.descripcion)}">
+      <span class="sugg-desc">${escapeHtml(it.descripcion)}</span>
+    </div>
+  `).join('');
+  suggList.style.display = 'block';
+  suggList.querySelectorAll('.sugg-item').forEach(el => {
+    // mousedown (no click) para que dispare ANTES del blur del input
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      descInput.value = el.dataset.desc;
+      suggList.style.display = 'none';
+    });
+  });
+}
+
 // Ítem editable dentro de "Vista previa" -- misma info que ya trae cada
 // renglón del Excel subido (Paso 2), pero corregible aquí mismo sin tener
 // que bajar el Excel, editarlo y volver a subirlo por un cambio pequeño.
@@ -354,7 +405,10 @@ function itemEditorRow(i) {
       <div class="row2">
         <div>
           <label>Descripción</label>
-          <input type="text" class="qi-desc" value="${escapeHtml(i.descripcion || '')}">
+          <div class="desc-wrap">
+            <input type="text" class="qi-desc" autocomplete="off" value="${escapeHtml(i.descripcion || '')}">
+            <div class="sugg-list"></div>
+          </div>
         </div>
         <div>
           <label>Modelo (opcional)</label>
