@@ -220,13 +220,35 @@ function render(opp, quote) {
     const btnGuardarItems = document.getElementById('btnGuardarItems');
     const itemsMsg = document.getElementById('itemsMsg');
 
+    // Recalcula Subtotal/ITBM/TOTAL a partir de lo que hay AHORA MISMO en el
+    // formulario (no de quote.subtotal, que queda desactualizado en cuanto se
+    // edita/agrega/quita un ítem) -- misma fórmula y mismo redondeo que
+    // computeTotals() en el servidor (server/index.js), para que lo que se ve
+    // en pantalla sea siempre lo que se va a guardar.
+    function recalcTotals() {
+      const rawSubtotal = [...itemsEditor.querySelectorAll('.qi-row')].reduce((s, row) => {
+        const cant = Number(row.querySelector('.qi-cant').value) || 0;
+        const precio = Number(row.querySelector('.qi-precio').value) || 0;
+        return s + cant * precio;
+      }, 0);
+      const rate = quote.itbm_rate != null ? Number(quote.itbm_rate) : 0.07;
+      const subtotal = Math.round(rawSubtotal * 100) / 100;
+      const itbm = Math.round(subtotal * rate * 100) / 100;
+      const total = Math.round((subtotal + itbm) * 100) / 100;
+      document.getElementById('totSubtotal').textContent = money(subtotal);
+      document.getElementById('totItbm').textContent = money(itbm);
+      document.getElementById('totTotal').textContent = money(total);
+    }
+
     btnAddItem.addEventListener('click', () => {
       itemsEditor.insertAdjacentHTML('beforeend', itemEditorRow({}));
+      recalcTotals();
     });
 
     itemsEditor.addEventListener('click', (e) => {
       if (!e.target.classList.contains('qi-rm')) return;
       e.target.closest('.qi-row').remove();
+      recalcTotals();
     });
 
     itemsEditor.addEventListener('input', (e) => {
@@ -235,6 +257,7 @@ function render(opp, quote) {
       const cant = Number(row.querySelector('.qi-cant').value) || 0;
       const precio = Number(row.querySelector('.qi-precio').value) || 0;
       row.querySelector('.qi-subtotal').textContent = `Subtotal: ${money(cant * precio)}`;
+      recalcTotals();
     });
 
     // Predicción de texto: mientras se escribe la descripción de un ítem, si
@@ -362,11 +385,10 @@ function renderPreview(quote, editable) {
     ${rows}
     ${quote.comentarios ? `<p style="font-size:.82rem;color:var(--gray-600);margin-top:10px"><b>Comentarios:</b> ${escapeHtml(quote.comentarios)}</p>` : ''}
     <div class="totals">
-      <div class="line"><span>Subtotal</span><span>${money(quote.subtotal)}</span></div>
-      <div class="line"><span>${itbmLabel(quote)}</span><span>${money(quote.itbm)}</span></div>
-      <div class="line total"><span>TOTAL</span><span>${money(quote.total)}</span></div>
+      <div class="line"><span>Subtotal</span><span id="totSubtotal">${money(quote.subtotal)}</span></div>
+      <div class="line"><span id="totItbmLabel">${itbmLabel(quote)}</span><span id="totItbm">${money(quote.itbm)}</span></div>
+      <div class="line total"><span>TOTAL</span><span id="totTotal">${money(quote.total)}</span></div>
     </div>
-    ${editable ? `<p style="font-size:.72rem;color:var(--gray-400);margin-top:6px;text-align:right">Los totales se actualizan al guardar los cambios de ítems.</p>` : ''}
   `;
 }
 
