@@ -1179,6 +1179,13 @@ app.all('/api/cron/close-company-id-constraints', async (req, res) => {
 app.use((err, req, res, next) => {
   console.error('Error no manejado en', req.method, req.path, ':', err);
   if (res.headersSent) return next(err);
+  // Multer tira esto ANTES de que la ruta se ejecute (ni siquiera pasa por su
+  // try/catch) con un mensaje en inglés ("File too large") -- sin este caso
+  // especial, el usuario solo veía un 500 críptico al fotografiar una
+  // factura con la cámara del celular en muy alta resolución.
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'El archivo es demasiado pesado. Baja la resolución/calidad de la foto (en Ajustes de la cámara) o toma la foto de nuevo, e intenta subirla otra vez.' });
+  }
   res.status(500).json({ error: err.message || 'Error interno del servidor' });
 });
 
