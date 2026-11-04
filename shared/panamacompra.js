@@ -19,6 +19,14 @@ const TIPO_PROCESO_COTIZACION = 2;
 const TIPO_PROCESO_COMPRA_MENOR = 6;
 const ESTADO_COMPRA_MENOR = { VIGENTE: 36 };
 
+// "Compra menor hasta 10,000" — OTRO tipo de proceso más (idTipoProceso 4),
+// distinto de la Compra Menor de 10k-50k (tipo 6). Confirmado en vivo
+// 2026-11-03 decodificando el link del portal-interno que usa el usuario
+// para ver sus compras menores adjudicadas: {"tp":4,"e":1011}. 1011 es el
+// estado "Adjudicado" tal como lo usa el filtro del listado.
+const TIPO_PROCESO_COMPRA_MENOR_10K = 4;
+const ESTADO_CM10K = { ADJUDICADO: 1011 };
+
 // Sin esto, una llamada a PanamaCompra que nunca responde deja colgado el
 // chequeo de correo para siempre: fetch() de Node no tiene timeout por
 // defecto, así que un solo request atascado bloquea (running=true) todos
@@ -113,13 +121,31 @@ async function buscarPorEstados(cookie, estados, registrosPorPagina = 500, idTip
 // "Cotización en línea > Enviadas") y confirmado en vivo contra la cuenta
 // real de la empresa.
 async function buscarEnviadas(cookie, registrosPorPagina = 100) {
+  return buscarEnviadasPorTipo(cookie, TIPO_PROCESO_COTIZACION, 0, registrosPorPagina);
+}
+
+// Secciones crudas (pageComponentes) de cualquier vista del portal-interno
+// de un proceso: "procesoVistaPliego", "procesoVistaMotivoAdjudicacion", etc.
+async function paginaComponentes(cookie, idTipoProceso, pagina, idProcesosContratacionFlujos) {
+  const res = await fetch(
+    `${BASE}/procesos-configuracion/pagina-componentes/${idTipoProceso}/${pagina}/${idProcesosContratacionFlujos}`,
+    { headers: { ...COMMON_HEADERS, Cookie: cookie }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+  );
+  if (!res.ok) throw new Error(`Vista ${pagina} falló: HTTP ${res.status}`);
+  const json = await res.json();
+  return (json.result && json.result.pageComponentes) || [];
+}
+
+// Igual que buscarEnviadas pero para cualquier tipo de proceso/estado (ej.
+// Compra menor hasta 10,000 adjudicadas: tipo 4, estado 1011).
+async function buscarEnviadasPorTipo(cookie, idTipoProceso, idEstado = 0, registrosPorPagina = 100) {
   const res = await fetch(`${BASE}/busqueda/proceso-lista`, {
     method: 'POST',
     headers: { ...COMMON_HEADERS, Cookie: cookie },
     body: JSON.stringify({
       registrosPorPagina,
       valorSiguiente: '',
-      filtro: { idTipoProceso: TIPO_PROCESO_COTIZACION, idEstado: 0, enviada: true, numProceso: '' },
+      filtro: { idTipoProceso, idEstado, enviada: true, numProceso: '' },
     }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -240,7 +266,7 @@ function extraerPrecio(texto) {
 }
 
 module.exports = {
-  login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas,
-  verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, tipoProcesoLabel, ESTADO, TIPO_PROCESO_COTIZACION,
-  TIPO_PROCESO_COMPRA_MENOR, ESTADO_COMPRA_MENOR,
+  login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas, buscarEnviadasPorTipo,
+  paginaComponentes, verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, tipoProcesoLabel, ESTADO,
+  TIPO_PROCESO_COTIZACION, TIPO_PROCESO_COMPRA_MENOR, ESTADO_COMPRA_MENOR, TIPO_PROCESO_COMPRA_MENOR_10K, ESTADO_CM10K,
 };

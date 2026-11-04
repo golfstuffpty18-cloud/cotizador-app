@@ -24,6 +24,7 @@ const { searchOpenByCategory, searchCompraMenor, runSearchJob } = require('../sh
 const { uploadToDropboxSafe, dropboxSubfolderFor } = require('../shared/dropboxUpload');
 const { syncOpportunityDocs } = require('../shared/syncOpportunityDocs');
 const { listarEnviadas, obtenerCuadroComparativo } = require('../shared/cotizacionesEnviadas');
+const { listarAdjudicadas, detalleAdjudicada, descargarDocumento } = require('../shared/compraMenorAdjudicadas');
 const { extractInvoiceData } = require('../shared/claudeInvoice');
 const { signDocument } = require('../shared/generateSignedDocument');
 const { generateAnnualReportPdf } = require('../shared/generateAnnualReportPdf');
@@ -536,6 +537,34 @@ app.get('/api/enviadas', async (req, res) => {
 app.get('/api/enviadas/:idProcesosContratacionFlujos/cuadro', async (req, res) => {
   const cuadro = await obtenerCuadroComparativo({ idProcesosContratacionFlujos: req.params.idProcesosContratacionFlujos });
   res.json(cuadro);
+});
+
+// Compra menor hasta 10,000 adjudicadas donde la empresa participó.
+app.get('/api/adjudicadas', async (req, res) => {
+  res.json(await listarAdjudicadas());
+});
+
+app.get('/api/adjudicadas/documento', async (req, res) => {
+  let buffer;
+  try {
+    buffer = await descargarDocumento(req.query.ruta);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message });
+  }
+  // Solo el nombre que manda el propio frontend (el nombreOriginal que dio
+  // PanamaCompra), saneado para el header.
+  const nombre = String(req.query.nombre || 'documento').replace(/[^\w.\- ()áéíóúñÁÉÍÓÚÑ]/g, '_').slice(0, 150);
+  const ext = (nombre.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+  const tipos = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  res.setHeader('Content-Type', tipos[ext.toLowerCase()] || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(nombre)}`);
+  res.send(buffer);
+});
+
+app.get('/api/adjudicadas/:idProcesosContratacionFlujos', async (req, res) => {
+  const id = req.params.idProcesosContratacionFlujos;
+  if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+  res.json(await detalleAdjudicada(id));
 });
 
 app.post('/api/search/panamacompra', async (req, res) => {

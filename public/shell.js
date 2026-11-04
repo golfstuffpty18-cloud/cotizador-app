@@ -11,12 +11,18 @@ const BRAND = {
 
 const USER = { name: 'GS Technologies', role: 'Administrador' };
 
+// Listado "Compra menor hasta 10,000 - Adjudicado" del portal-interno de
+// PanamaCompra (requiere sesión de la empresa en PanamaCompra).
+const PANAMACOMPRA_CM10K_ADJUDICADAS_URL = 'https://www.panamacompra.gob.pa/Inicio/portal-interno/#/proceso/actos-publicos/compra-menor-hasta-10-000-adjudicado/9FjOi4WZiwSMxATM6ISZiwCN6ICc0JCLi8GZhNWakVnakFEItACMwADLwEDIhR3chhGIy9mbl1GIhJHct92QiojI0Jye';
+
 const NAV_ITEMS = [
   { href: '/index.html', icon: 'quote', label: 'Cotización en línea' },
   { href: '/compra-menor.html', icon: 'cart', label: 'Compra Menor' },
   { href: '/calendario.html', icon: 'calendar', label: 'Calendario' },
   { href: '/programadas.html', icon: 'bell', label: 'Programadas' },
   { href: '/enviadas.html', icon: 'send', label: 'Enviadas' },
+  { href: '/adjudicadas.html', icon: 'receipt', label: 'Adjudicadas' },
+  { href: PANAMACOMPRA_CM10K_ADJUDICADAS_URL, icon: 'inbox', label: 'PanamaCompra: CM adjudicadas', external: true },
   { href: '/directo.html', icon: 'bolt', label: 'Directas' },
   { href: '/catalog.html', icon: 'book', label: 'Catálogo' },
   { href: '/finanzas.html', icon: 'finance', label: 'Finanzas' },

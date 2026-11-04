@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compras menores adjudicadas | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .btn{ padding:10px 14px; border-radius:999px; border:2px solid var(--border); background:var(--surface); color:var(--text); font-weight:700; font-size:.82rem; cursor:pointer; width:100%; }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .toolbar a{ font-size:.82rem; font-weight:700; color:var(--blue); text-decoration:none; }
+  .toolbar .resumen{ font-size:.82rem; color:var(--text-soft); flex:1; }
+  .det{ margin-top:12px; font-size:.82rem; }
+  .det h3{ font-size:.72rem; text-transform:uppercase; color:var(--text-faint); margin:16px 0 6px; font-weight:800; letter-spacing:.03em; }
+  .det dl{ display:grid; grid-template-columns:max-content 1fr; gap:4px 12px; margin:0; }
+  .det dt{ color:var(--text-faint); }
+  .det dd{ margin:0; white-space:pre-wrap; word-break:break-word; }
+  .det table{ width:100%; border-collapse:collapse; }
+  .det th, .det td{ text-align:left; padding:6px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .det th{ color:var(--text-faint); font-size:.68rem; text-transform:uppercase; }
+  .det td.num{ text-align:right; white-space:nowrap; }
+  .det .desc{ white-space:pre-wrap; max-height:7.5em; overflow:auto; }
+  .docs{ list-style:none; padding:0; margin:0; }
+  .docs li{ padding:6px 0; border-bottom:1px solid var(--border); }
+  .docs a{ color:var(--blue); font-weight:700; text-decoration:none; word-break:break-word; }
+  .docs small{ display:block; color:var(--text-faint); }
+  .total{ font-size:1.05rem; font-weight:800; color:var(--green); }
+  .sin-datos{ font-size:.8rem; color:var(--text-faint); padding:6px 0; }
+  #filtro{ width:100%; padding:10px 14px; border-radius:999px; border:2px solid var(--border); background:var(--surface); color:var(--text); margin-bottom:14px; font-size:.85rem; }
+</style>
+</head>
+<body>
+<script>window.PAGE_META = { title: 'Compras menores adjudicadas', subtitle: 'Compra menor hasta B/.10,000 adjudicadas donde GS Technologies envió propuesta' };</script>
+<div id="app-shell"></div>
+
+<main class="content">
+  <div class="toolbar">
+    <span class="resumen" id="resumen"></span>
+    <a id="linkPortal" target="_blank" rel="noopener">Abrir listado en PanamaCompra ↗</a>
+  </div>
+  <input type="search" id="filtro" placeholder="Filtrar por número o título…">
+  <div id="list">Consultando PanamaCompra…</div>
+</main>
+
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
+<script src="/adjudicadas.js"></script>
+</body>
+</html>
