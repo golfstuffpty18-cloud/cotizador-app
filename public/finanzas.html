@@ -100,6 +100,59 @@
   .reporte-item .fecha{ color:var(--text-soft); font-size:.74rem; }
   .reporte-item .acciones{ display:flex; gap:8px; }
   .reporte-item .acciones a, .reporte-item .acciones button{ font-size:.74rem; padding:5px 10px; border-radius:999px; border:2px solid var(--border); background:var(--surface); color:var(--text); text-decoration:none; cursor:pointer; }
+
+  /* ===== Rentabilidad =====
+     Colores de la gráfica fijos por concepto (no por posición), validados
+     para daltonismo con la guía de gráficas; el celular usa tema oscuro
+     (ver styles.css) y recibe sus propios tonos, validados contra esa
+     superficie. */
+  .rent{
+    --serie-proyectos:#2a78d6; --serie-generales:#eb6834; --serie-ganancia:#1baf7a;
+  }
+  @media (max-width: 768px){
+    .rent{ --serie-proyectos:#3987e5; --serie-generales:#d95926; --serie-ganancia:#199e70; }
+  }
+  /* Montos largos (B/. 9,259.99) no caben en 3 columnas en el celular. */
+  .rent .resumen-grid{ grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
+  .rent-controles{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  .rent-controles select{ width:auto; flex:1; min-width:120px; margin-bottom:0; }
+  .rent-seg{ display:flex; border:2px solid var(--border); border-radius:999px; overflow:hidden; }
+  .rent-seg button{ border:none; background:var(--surface); color:var(--text-soft); font-weight:700; font-size:.8rem; padding:8px 16px; cursor:pointer; }
+  .rent-seg button.activo{ background:var(--blue); color:#fff; }
+  .rent-descargas{ display:flex; gap:8px; margin-bottom:14px; }
+  .rent-descargas .fin-btn{ flex:1; text-align:center; text-decoration:none; font-size:.8rem; padding:9px 12px; }
+  .rent-sub{ font-size:.72rem; color:var(--text-faint); text-align:center; margin-top:2px; }
+  .rent-chart{ display:flex; gap:22px; align-items:center; flex-wrap:wrap; justify-content:center; margin:16px 0 6px; }
+  .rent-chart svg{ flex-shrink:0; }
+  .rent-chart path{ stroke:var(--surface); stroke-width:2; cursor:default; }
+  .rent-chart svg.una path{ stroke:none; }
+  .rent-chart path:hover{ opacity:.85; }
+  .rent-centro-valor{ font-size:22px; font-weight:800; fill:var(--text); }
+  .rent-centro-valor.neg{ fill:var(--red); }
+  .rent-centro-label{ font-size:11px; fill:var(--text-soft); }
+  .rent-leyenda{ list-style:none; padding:0; margin:0; min-width:200px; }
+  .rent-leyenda li{ display:flex; gap:10px; align-items:flex-start; padding:7px 0; }
+  .rent-leyenda .sw{ width:12px; height:12px; border-radius:3px; flex-shrink:0; margin-top:3px; }
+  .rent-leyenda b{ display:block; font-size:.82rem; color:var(--text); }
+  .rent-leyenda span{ font-size:.78rem; color:var(--text-soft); }
+  .rent-nota{ font-size:.76rem; color:var(--text-soft); text-align:center; margin:4px 0 10px; }
+  .rent-vacio{ text-align:center; color:var(--text-soft); font-size:.82rem; padding:22px 0; }
+  .rent-tabla{ width:100%; border-collapse:collapse; font-size:.78rem; margin-top:12px; }
+  .rent-tabla th, .rent-tabla td{ padding:7px 6px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
+  .rent-tabla th:first-child, .rent-tabla td:first-child{ text-align:left; }
+  .rent-tabla th{ font-size:.66rem; text-transform:uppercase; color:var(--text-faint); }
+  .rent-tabla tbody tr{ cursor:pointer; }
+  .rent-tabla tbody tr:hover td{ background:var(--surface-2); }
+  .rent-tabla tfoot td{ font-weight:800; }
+  .rent-tabla .neg{ color:var(--red); }
+  .rent-tabla-wrap{ overflow-x:auto; }
+  .rent-lista-toggle{ font-size:.78rem; color:var(--blue); font-weight:700; cursor:pointer; margin-top:12px; }
+  .rent-lista{ display:none; margin-top:6px; }
+  .rent-lista.show{ display:block; }
+  .rent-fila{ display:flex; justify-content:space-between; gap:10px; font-size:.78rem; padding:6px 0; border-bottom:1px solid var(--border); }
+  .rent-fila .q{ color:var(--text); flex:1; }
+  .rent-fila .q small{ display:block; color:var(--text-faint); }
+  .rent-fila .m{ font-weight:700; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -107,6 +160,23 @@
 <div id="app-shell"></div>
 
 <main class="content">
+  <section id="rentabilidadSection" class="rent">
+    <h2>Rentabilidad (sin ITBM)</h2>
+    <div class="rent-controles">
+      <div class="rent-seg" role="tablist" aria-label="Período">
+        <button type="button" data-modo="mensual" class="activo">Mensual</button>
+        <button type="button" data-modo="anual">Anual</button>
+      </div>
+      <select id="rentAnio" aria-label="Año"></select>
+      <select id="rentMes" aria-label="Mes"></select>
+    </div>
+    <div class="rent-descargas">
+      <a id="rentPdf" class="fin-btn fin-btn-ghost" target="_blank">📄 Descargar PDF</a>
+      <a id="rentExcel" class="fin-btn fin-btn-ghost">📊 Descargar Excel</a>
+    </div>
+    <div id="rentBody">Cargando…</div>
+  </section>
+
   <section id="resumenSection">
     <h2>Resumen del año</h2>
     <div id="resumenBody">Cargando…</div>
@@ -215,5 +285,6 @@
 <script src="/icons.js"></script>
 <script src="/shell.js"></script>
 <script src="/finanzas.js"></script>
+<script src="/finanzas-rentabilidad.js"></script>
 </body>
 </html>

@@ -29,6 +29,9 @@ const { extractInvoiceData } = require('../shared/claudeInvoice');
 const { signDocument } = require('../shared/generateSignedDocument');
 const { generateAnnualReportPdf } = require('../shared/generateAnnualReportPdf');
 const { generateProjectReportPdf } = require('../shared/generateProjectReportPdf');
+const { calcularRentabilidad, aniosConFacturas } = require('../shared/rentabilidad');
+const { generateRentabilidadPdf } = require('../shared/generateRentabilidadPdf');
+const { generateRentabilidadExcel } = require('../shared/generateRentabilidadExcel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -923,6 +926,49 @@ app.get('/api/finanzas/reporte-anual/pdf', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="Reporte anual ${resumen.anio}.pdf"`);
   res.send(pdfBuffer);
+});
+
+// Rentabilidad mensual (?anio=2026&mes=11) o anual (?anio=2026), SIN ITBM.
+// Las tres rutas usan el mismo cálculo (shared/rentabilidad.js).
+async function rentabilidadDesdeQuery(req, res) {
+  try {
+    return await calcularRentabilidad(pool, { anio: req.query.anio || new Date().getFullYear(), mes: req.query.mes }, resolveCompanyId(req));
+  } catch (err) {
+    if (err.status === 400) { res.status(400).json({ error: err.message }); return null; }
+    throw err;
+  }
+}
+
+function nombreArchivoRentabilidad(r, ext) {
+  const p = r.periodo;
+  return `Rentabilidad ${p.mes ? `${p.anio}-${String(p.mes).padStart(2, '0')}` : p.anio}.${ext}`;
+}
+
+app.get('/api/finanzas/rentabilidad', async (req, res) => {
+  const r = await rentabilidadDesdeQuery(req, res);
+  if (r) res.json(r);
+});
+
+app.get('/api/finanzas/rentabilidad/anios', async (req, res) => {
+  res.json(await aniosConFacturas(pool, resolveCompanyId(req)));
+});
+
+app.get('/api/finanzas/rentabilidad/pdf', async (req, res) => {
+  const r = await rentabilidadDesdeQuery(req, res);
+  if (!r) return;
+  const pdf = await generateRentabilidadPdf(r);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombreArchivoRentabilidad(r, 'pdf')}"`);
+  res.send(pdf);
+});
+
+app.get('/api/finanzas/rentabilidad/excel', async (req, res) => {
+  const r = await rentabilidadDesdeQuery(req, res);
+  if (!r) return;
+  const xlsx = await generateRentabilidadExcel(r);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivoRentabilidad(r, 'xlsx')}"`);
+  res.send(xlsx);
 });
 
 app.get('/api/finanzas/:id', async (req, res) => {

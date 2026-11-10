@@ -256,6 +256,9 @@ function toggleProyectosTabla() {
 }
 
 async function loadResumen() {
+  // Cualquier cambio de facturas que refresca el resumen anual también debe
+  // refrescar la sección de rentabilidad (finanzas-rentabilidad.js).
+  if (window.loadRentabilidad) window.loadRentabilidad();
   const anio = $('filtroAnio').value || new Date().getFullYear();
   const res = await fetch(`/api/finanzas/resumen?anio=${encodeURIComponent(anio)}`);
   const data = await res.json();
