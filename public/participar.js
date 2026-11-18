@@ -47,6 +47,7 @@ function card(op) {
     <div class="p-estado ${est.cls}">${est.txt}</div>
     <div class="p-acciones">
       <a class="p-btn primario" href="/quote.html?id=${op.id}">${op.quote_estado ? 'Abrir cotización →' : 'Armar cotización →'}</a>
+      <a class="p-btn" href="/api/opportunities/${op.id}/panamacompra" target="_blank" rel="noopener">Ver en PanamaCompra ↗</a>
       ${op.quote_estado === 'aprobada' ? `<a class="p-btn" href="/api/opportunities/${op.id}/quote/pdf" target="_blank">📄 PDF</a>` : ''}
     </div>
   `;

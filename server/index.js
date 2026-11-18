@@ -562,6 +562,35 @@ app.get('/api/participar', async (req, res) => {
   res.json(rows);
 });
 
+// Abre el acto en el portal-interno de PanamaCompra ("Ver pliego"). El link
+// necesita el idProcesosContratacionFlujos, que la tabla no guarda: se busca
+// el acto por número una vez y se cachea en memoria (no cambia).
+const pcLinkCache = new Map();
+app.get('/api/opportunities/:id/panamacompra', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, act_number, convocatoria FROM opportunities WHERE id = $1 AND company_id = $2',
+    [req.params.id, resolveCompanyId(req)]
+  );
+  if (!rows.length) return res.status(404).send('Acto no encontrado');
+  const op = rows[0];
+  let url = pcLinkCache.get(op.id);
+  if (!url) {
+    try {
+      const pc = require('../shared/panamacompra');
+      const cookie = await pc.login(process.env.PC_USUARIO, process.env.PC_CONTRASENA);
+      const { registros } = await pc.buscarProcesoCualquierEstado(cookie, op.act_number);
+      const r = registros.find((x) => x.numProceso === op.act_number && (!op.convocatoria || String(x.numeroConvocatoria) === String(op.convocatoria)))
+        || registros.find((x) => x.numProceso === op.act_number);
+      if (r) { url = pc.urlPliegoPortal(r); pcLinkCache.set(op.id, url); }
+    } catch (err) {
+      console.error('Link PanamaCompra falló para', op.act_number, err.message);
+    }
+  }
+  // Si no se encontró (o PanamaCompra no respondió), al menos la búsqueda
+  // avanzada del portal, donde se puede pegar el número de acto.
+  res.redirect(url || 'https://www.panamacompra.gob.pa/Inicio/portal-interno/#/proceso/busqueda-avanzada');
+});
+
 // Compra menor hasta 10,000 adjudicadas donde la empresa participó.
 app.get('/api/adjudicadas', async (req, res) => {
   res.json(await listarAdjudicadas());

@@ -162,7 +162,8 @@ function card(op) {
       <button class="yes ${op.decision === 'participar' ? 'active' : ''}">Sí, participar</button>
       <button class="no ${op.decision === 'no_participar' ? 'active' : ''}">No participar</button>
     </div>
-    ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}`}
+    ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}
+    <a class="pc-link" href="/api/opportunities/${op.id}/panamacompra" target="_blank" rel="noopener">Ver en PanamaCompra ↗</a>`}
   `;
   if (!isPlaceholder) {
     div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));

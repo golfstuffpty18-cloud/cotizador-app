@@ -54,6 +54,7 @@ function card(op) {
       <button class="no ${op.decision === 'no_participar' ? 'active' : ''}">No participar</button>
     </div>
     ${op.decision === 'participar' ? `<a class="quote-link" href="/quote.html?id=${op.id}">Armar cotización →</a>` : ''}
+    <a class="pc-link" href="/api/opportunities/${op.id}/panamacompra" target="_blank" rel="noopener">Ver en PanamaCompra ↗</a>
   `;
   div.querySelector('.yes').addEventListener('click', () => decide(op.id, 'participar'));
   div.querySelector('.no').addEventListener('click', () => decide(op.id, 'no_participar'));

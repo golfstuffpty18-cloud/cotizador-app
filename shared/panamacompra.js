@@ -252,6 +252,33 @@ async function descargarArchivo(cookie, rutaCompleta) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Link directo al "Ver pliego" del acto en el portal-interno de PanamaCompra
+// (el usuario debe tener sesión iniciada ahí). Formato copiado del bundle
+// JS del portal (2026-11-18): la acción "Ver pliego" del listado navega a
+//   /proceso/{cotizacion-en-linea|acto-publico}/ver-pliego/<data>
+// donde <data> = JSON {r,p,i,tp,ipo} -> base64 url-safe sin "=" -> invertido
+// (Xe.encodeUrl en el portal). Solo Cotización en línea (tipo 2) usa la
+// ruta "cotizacion-en-linea"; Compra Menor y demás actos usan "acto-publico".
+const PORTAL_INTERNO = 'https://www.panamacompra.gob.pa/Inicio/portal-interno/#';
+
+function encodeUrlPortal(texto) {
+  const b64 = Buffer.from(texto, 'utf8').toString('base64').replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' })[c]);
+  return [...b64].reverse().join('');
+}
+
+function urlPliegoPortal(registro) {
+  const tp = registro.idTipoProceso;
+  const data = JSON.stringify({
+    r: '',
+    p: 'procesoVistaPliego',
+    i: registro.idProcesosContratacionFlujos,
+    tp,
+    ipo: registro.idProcesosOfertasRegistros ?? null,
+  });
+  const grupo = tp === TIPO_PROCESO_COTIZACION ? 'cotizacion-en-linea' : 'acto-publico';
+  return `${PORTAL_INTERNO}/proceso/${grupo}/ver-pliego/${encodeUrlPortal(data)}`;
+}
+
 // Nombre que usa la app para cada tipo de proceso (pantallas separadas:
 // "Cotización en línea" y "Compra Menor"). Centralizado acá para que
 // searchPanamaCompra.js y checkEmailJob.js no dupliquen el mismo mapeo.
@@ -267,6 +294,6 @@ function extraerPrecio(texto) {
 
 module.exports = {
   login, buscarProceso, buscarProcesoCualquierEstado, buscarPorEstados, buscarEnviadas, buscarEnviadasPorTipo,
-  paginaComponentes, verPliego, descargarArchivo, cuadroPropuesta, extraerPrecio, tipoProcesoLabel, ESTADO,
+  paginaComponentes, verPliego, descargarArchivo, urlPliegoPortal, encodeUrlPortal, cuadroPropuesta, extraerPrecio, tipoProcesoLabel, ESTADO,
   TIPO_PROCESO_COTIZACION, TIPO_PROCESO_COMPRA_MENOR, ESTADO_COMPRA_MENOR, TIPO_PROCESO_COMPRA_MENOR_10K, ESTADO_CM10K,
 };

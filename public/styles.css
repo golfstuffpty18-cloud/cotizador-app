@@ -253,6 +253,11 @@ h1, h2, h3, p { margin: 0; }
   border-radius: 999px; background: var(--blue); color: #fff; font-weight: 700; font-size: 0.82rem; text-decoration: none;
 }
 
+.pc-link {
+  display: block; text-align: center; margin-top: 8px; padding: 9px;
+  border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--blue); font-weight: 700; font-size: 0.8rem; text-decoration: none;
+}
+
 .empty { text-align: center; color: var(--text-faint); padding: 60px 20px; font-size: 0.9rem; }
 .status-msg { text-align: center; font-size: 0.8rem; color: var(--text-soft); margin: 4px 0 14px; }
 
