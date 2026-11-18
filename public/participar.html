@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participaré | GS Technologies</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#0a0a1a">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .p-tipo{ display:inline-block; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; padding:3px 8px; border-radius:999px; background:var(--surface-2); color:var(--text-soft); margin-left:6px; }
+  .p-cierre{ font-size:.8rem; margin:8px 0; color:var(--text-soft); }
+  .p-cierre b{ color:var(--text); }
+  .p-cierre.urgente b{ color:var(--red); }
+  .p-estado{ font-size:.78rem; font-weight:700; margin:6px 0 10px; }
+  .p-estado.sin{ color:var(--text-faint); }
+  .p-estado.borrador{ color:var(--amber); }
+  .p-estado.aprobada{ color:var(--green); }
+  .p-acciones{ display:flex; gap:8px; flex-wrap:wrap; }
+  .p-btn{ flex:1; min-width:140px; text-align:center; text-decoration:none; padding:10px 14px; border-radius:999px; font-weight:700; font-size:.82rem; border:2px solid var(--border); background:var(--surface); color:var(--text); }
+  .p-btn.primario{ background:var(--blue); border-color:var(--blue); color:#fff; }
+</style>
+</head>
+<body>
+<script>window.PAGE_META = { title: 'Participaré', subtitle: 'Actos donde marcaste "Sí, participar" y que todavía no cierran, con acceso directo a su cotización' };</script>
+<div id="app-shell"></div>
+
+<main class="content">
+  <div id="list">Cargando…</div>
+</main>
+
+<script src="/icons.js"></script>
+<script src="/shell.js"></script>
+<script src="/participar.js"></script>
+</body>
+</html>

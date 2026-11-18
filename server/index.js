@@ -542,6 +542,26 @@ app.get('/api/enviadas/:idProcesosContratacionFlujos/cuadro', async (req, res) =
   res.json(cuadro);
 });
 
+// Acceso directo "Participaré": todos los actos de PanamaCompra (Cotización
+// en línea y Compra Menor, abiertos o programados) donde el usuario marcó
+// "Sí, participar" y que todavía no cierran, con el estado de su cotización.
+app.get('/api/participar', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT o.id, o.act_number, o.convocatoria, o.title, o.entity, o.reference_price, o.window_info,
+            o.deadline, o.window_start, o.tipo_proceso, o.decided_at,
+            q.estado AS quote_estado, q.total AS quote_total, q.updated_at AS quote_updated_at
+     FROM opportunities o
+     LEFT JOIN quotes q ON q.opportunity_id = o.id
+     WHERE o.decision = 'participar'
+       AND o.source = 'panamacompra'
+       AND o.company_id = $1
+       AND (o.deadline IS NULL OR o.deadline > now())
+     ORDER BY o.deadline ASC NULLS LAST, o.id DESC`,
+    [resolveCompanyId(req)]
+  );
+  res.json(rows);
+});
+
 // Compra menor hasta 10,000 adjudicadas donde la empresa participó.
 app.get('/api/adjudicadas', async (req, res) => {
   res.json(await listarAdjudicadas());

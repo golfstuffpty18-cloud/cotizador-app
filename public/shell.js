@@ -18,6 +18,7 @@ const PANAMACOMPRA_CM10K_ADJUDICADAS_URL = 'https://www.panamacompra.gob.pa/Inic
 const NAV_ITEMS = [
   { href: '/index.html', icon: 'quote', label: 'Cotización en línea' },
   { href: '/compra-menor.html', icon: 'cart', label: 'Compra Menor' },
+  { href: '/participar.html', icon: 'check', label: 'Participaré' },
   { href: '/calendario.html', icon: 'calendar', label: 'Calendario' },
   { href: '/programadas.html', icon: 'bell', label: 'Programadas' },
   { href: '/enviadas.html', icon: 'send', label: 'Enviadas' },
